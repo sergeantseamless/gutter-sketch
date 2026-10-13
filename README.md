@@ -30,6 +30,8 @@ Keep it that way. No customer data, exports, credentials or other files belong i
 
 ## Version history
 
+- **v2.2** (2026-10-13) — no marks at miters (corners speak for themselves; BAY chip only); drop outlet accessory (circle) counted as an outlet; multi-select can set gutter covers on/off; existing runs take covers + an option group (length still optional, soft warning on export if covered with no length); splash guard adds 2.5' coil to the main profile; material list: Jobber color dropdowns for gutter/downspout, Wedges (none/regular/steep/T), hangers auto (new LF ÷ 2), spray paint auto (1 can of gutter color when color isn't white/brown and wedges are used), zip screws removed; profile and downspout-size names now match the Jobber custom fields.
+
 - **v2.1** (2026-10-13) — "Lower roof" moved from termination to the story list (label `LR`, 2 pipe bands); **Multi** button next to Select for multi-select (group reassignment, group move, delete all); splash guard drawn as a star; story labels (1–3 st) in the palette to drop on sections of the house; downspouts can be marked **REUSE EXISTING** (hollow slashed square, not counted).
 
 - **v2** (2026-10-13) — auto-miters at corners (tap a corner to flip inside/outside/bay), length-only run labels, existing-gutter dashed runs, downspout stories 1–3 in half steps, elbow row with 2"/4"/6" offsets counted in the material list, pipe bands 2/3/3/4/4 by story, callout presets (Tie-in).
