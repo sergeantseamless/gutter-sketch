@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Gutter Sketch">
 <meta name="theme-color" content="#001738">
+<meta name="robots" content="noindex, nofollow">
 <title>Gutter Sketch — Sergeant Seamless</title>
 <style>
 :root{--navy:#001738;--gold:#FFCE34;--cream:#FFF0C3;--red:#F15D22;--grey:#c9c9c9}
@@ -37,6 +38,7 @@ body.field #fullUI{display:none}
 #fieldUI .ftop{position:absolute;top:0;left:0;right:0;display:flex;gap:10px;padding:10px;padding-top:calc(10px + env(safe-area-inset-top));pointer-events:none;align-items:flex-start}
 #fieldUI .ftop>*{pointer-events:auto}
 #fieldUI .ftop .btn{min-height:72px;font-size:22px;border-radius:14px;padding:0 20px}
+#fieldUI .ftop .btn.active{background:var(--gold);border-color:var(--gold)}
 #fieldUI .ftop .spacer{flex:1}
 #fieldHint{position:absolute;left:50%;transform:translateX(-50%);top:calc(92px + env(safe-area-inset-top));background:var(--navy);color:#fff;font-weight:800;font-size:22px;padding:12px 22px;border-radius:14px;pointer-events:none;text-align:center;max-width:90vw}
 #fieldHint:empty{display:none}
@@ -84,7 +86,7 @@ body.full #contBar{bottom:16px}
 #photoStrip .th span{position:absolute;left:3px;top:3px;background:var(--gold);color:var(--navy);font-weight:900;font-size:13px;border-radius:999px;min-width:22px;text-align:center;padding:2px 4px}
 
 /* material panel */
-#matPanel{position:absolute;left:0;right:0;bottom:0;background:var(--cream);border-top:4px solid var(--navy);max-height:46%;display:flex;flex-direction:column;transition:max-height .2s}
+#matPanel{position:absolute;left:0;right:0;bottom:0;background:var(--cream);border-top:4px solid var(--navy);max-height:46%;display:flex;flex-direction:column;transition:max-height .2s;z-index:7}
 #matPanel.collapsed{max-height:52px}
 #matPanel .mhead{display:flex;gap:6px;align-items:center;padding:6px 8px;background:var(--navy);color:#fff;font-weight:800}
 #matPanel .mhead .btn{min-height:40px}
@@ -115,7 +117,7 @@ body.full #contBar{bottom:16px}
 .seg{display:flex;gap:6px;flex-wrap:wrap}
 .seg .btn{background:#fff;color:var(--navy);border:2px solid var(--navy);min-width:56px}
 .seg .btn.active{background:var(--gold)}
-.seg.big .btn{min-height:72px;font-size:26px;min-width:84px}
+.seg.big .btn{min-height:72px;font-size:26px;min-width:72px;padding:0 12px}
 .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:8px;flex-wrap:wrap}
 .actions .btn{min-height:56px;font-size:17px;padding:0 20px}
 .seqbox{min-height:56px;border:2px solid var(--navy);border-radius:10px;background:#fff;font-size:28px;font-weight:900;letter-spacing:4px;padding:6px 12px;flex:1;display:flex;align-items:center;min-width:140px}
@@ -159,6 +161,7 @@ body.full #contBar{bottom:16px}
     <div class="ftop">
       <button class="btn ghost" id="fUndo">↶ UNDO</button>
       <button class="btn ghost" id="fJobs">JOBS</button>
+      <button class="btn ghost" id="fExist">EXISTING</button>
       <span class="spacer"></span>
       <button class="btn gold" id="fFinish">FINISH IN TRUCK ▸</button>
     </div>
@@ -211,6 +214,7 @@ body.full #contBar{bottom:16px}
           <div class="pgroup"><h4>Gutter</h4>
             <div class="pgrid">
               <button class="btn wide" data-tool="run">Gutter Run</button>
+              <button class="btn wide" data-tool="run" data-sub="existing">Existing Gutter (dashed)</button>
               <button class="btn wide" data-tool="ds">Downspout</button>
             </div>
           </div>
@@ -218,9 +222,8 @@ body.full #contBar{bottom:16px}
             <div class="pgrid">
               <button class="btn" data-tool="acc" data-sub="splashguard">Splash Guard</button>
               <button class="btn" data-tool="acc" data-sub="splashblock">Splash Block</button>
-              <button class="btn" data-tool="acc" data-sub="offset">Offset / Jog</button>
               <button class="btn" data-tool="acc" data-sub="dripedge">Drip Edge Ext.</button>
-              <button class="btn wide" data-tool="acc" data-sub="rainchain">Rain Chain</button>
+              <button class="btn" data-tool="acc" data-sub="rainchain">Rain Chain</button>
             </div>
           </div>
           <div class="pgroup"><h4>Hazards / Attention</h4>
@@ -310,7 +313,12 @@ const GROUPS = [
 const NAVY='#001738', GOLD='#FFCE34', CREAM='#FFF0C3', RED='#F15D22', ERR='#E00000';
 const GRID = 20;                 // world units per grid square
 const PROFILES = ['6"K','7"K','Half Round','EuroBox','Other'];
-const ENDS = [['endcap','End cap'],['miter_in','Miter inside'],['miter_out','Miter outside'],['miter_bay','Miter bay'],['continues','Continues']];
+const ENDS = [['auto','Auto'],['endcap','End cap'],['miter_in','Miter inside'],['miter_out','Miter outside'],['miter_bay','Miter bay'],['continues','Continues']];
+const STORIES = [1,1.5,2,2.5,3];
+const STRAPS = {1:2, 1.5:3, 2:3, 2.5:4, 3:4};          // pipe bands per downspout by story
+const SEQ_TOKENS = ['A','B','2"','4"','6"'];             // elbow / offset tokens, tapped in order
+const OFFSET_SIZES = ['2"','4"','6"'];
+const CALLOUT_PRESETS = ['Tie-in', 'Tie-in to existing', 'Remove existing', 'Reuse existing DS'];
 const DS_SIZES = ['3x4','4" round','4x5','square'];
 const TERMS = [['splashblock','Splash block'],['drain','Drain'],['lowerroof','Lower roof'],['driveway','Driveway'],['rainchain','Rain chain'],['other','Other']];
 const ACC = {splashguard:{n:'Splash guard',ab:'SG'}, splashblock:{n:'Splash block',ab:'SB'}, offset:{n:'Offset / jog',ab:'OFF'}, dripedge:{n:'Drip edge ext.',ab:'DE'}, rainchain:{n:'Rain chain',ab:'RC'}};
@@ -365,17 +373,27 @@ function newJob(){
   return { id: uid(), customer:'', address:'', date: todayISO(), quote:'', prep: localStorage.getItem('gs_prep') || '',
     items: [], photos: [], photoSeq: 0,
     bg: {type:'grid', rot:0, imgId:null, w:0, h:0},
-    manual: {gutterColor:'', dsColor:'', hangerType:'flat fascia', hangerQty:'', zipScrews:'', flexPipes:'', offsets:'', sprayPaint:'', notes:'', straps:{}},
-    defaults: {profile:'6"K', cover:false, story:1, lend:'endcap', rend:'endcap', dsSize:'3x4', dsStory:1, dsTerm:'splashblock', group:0},
+    manual: {gutterColor:'', dsColor:'', hangerType:'flat fascia', hangerQty:'', zipScrews:'', flexPipes:'', sprayPaint:'', notes:'', straps:{}}, corners:{}, v:2,
+    defaults: {profile:'6"K', cover:false, story:1, lend:'auto', rend:'auto', dsSize:'3x4', dsStory:1, dsTerm:'splashblock', group:0},
     view: {tx:80, ty:140, s:1}, mode:'field', created: Date.now(), updated: Date.now() };
 }
 let job = null;
 function openJob(id){
   job = store.jobs[id]; store.current = id;
   // migrate missing fields defensively
-  const fresh = newJob();
+  const fresh = newJob(); const hadV = job.v;
   for (const k of Object.keys(fresh)) if (job[k] === undefined) job[k] = fresh[k];
-  job.manual.straps ||= {};
+  job.v = hadV;
+  job.manual.straps ||= {}; job.corners ||= {};
+  if (!job.v || job.v < 2) { // v1 -> v2: ends were defaulted to end cap; elbow sequence was a plain string
+    for (const it of job.items) {
+      if (it.type==='run') { if (it.lend==='endcap') it.lend='auto'; if (it.rend==='endcap') it.rend='auto'; }
+      if (it.type==='ds' && typeof it.seq === 'string') it.seq = it.seq.split('').filter(c => c==='A'||c==='B');
+    }
+    if (job.defaults.lend==='endcap') job.defaults.lend='auto'; if (job.defaults.rend==='endcap') job.defaults.rend='auto';
+    job.v = 2;
+  }
+  for (const it of job.items) if (it.type==='ds' && !Array.isArray(it.seq)) it.seq = typeof it.seq==='string' ? it.seq.split('').filter(c=>c==='A'||c==='B') : [];
   undoStack.length = 0; redoStack.length = 0; sel = null; pendingStart = null; lastEnd = null; lastTouch = null;
   const runs = job.items.filter(i => i.type === 'run'); if (runs.length) { const r = runs[runs.length-1]; lastEnd = {x:r.x2, y:r.y2}; }
   setMode(job.mode || 'field', true);
@@ -461,7 +479,36 @@ function pdfPainter(doc, ox, oy, bx, by, k){
 function groupColor(g, field){ return field ? '#000' : GROUPS[g||0].c; }
 function endLabel(code){ return (ENDS.find(e=>e[0]===code)||ENDS[0])[1]; }
 function termLabel(code){ return (TERMS.find(e=>e[0]===code)||[code,code])[1]; }
-function runLabel(r){ let s = `${r.len||'?'}'  ${r.profile||''}`; if (r.story===2) s += '  2st'; if (r.cover) s += '  +cover'; return s.trim(); }
+function seqText(seq){ if (!Array.isArray(seq)) return String(seq||''); let s=''; let prevLetter=false; for (const t of seq) { const letter = t==='A'||t==='B'; s += (s && !(letter && prevLetter)) ? ' '+t : t; prevLetter = letter; } return s; }
+function dominantProfile(){ const lf={}; for (const it of job.items) if (it.type==='run' && !it.existing) lf[it.profile||'?'] = (lf[it.profile||'?']||0) + (+it.len||0); let best=null, bv=-1; for (const k in lf) if (lf[k]>bv) { bv=lf[k]; best=k; } return best; }
+function runLabel(r, dom){
+  if (r.existing) return (r.len>0 ? `${r.len}'  ` : '') + 'existing';
+  let s = `${r.len||'?'}'`; if (r.profile && r.profile!==dom) s += `  ${r.profile}`; if (r.story===2) s += '  2st'; if (r.cover) s += '  +cover'; return s;
+}
+const CK = (x,y) => `${Math.round(x)},${Math.round(y)}`;
+// Resolve 'auto' run ends: a shared endpoint is a miter (inside/outside from the house shape), a loose end is an end cap.
+function resolveEnds(){
+  const runs = job.items.filter(i => i.type==='run' && !i.existing);
+  const ends = []; runs.forEach(r => { ends.push({r, e:1, x:r.x1, y:r.y1}); ends.push({r, e:2, x:r.x2, y:r.y2}); });
+  const res = new Map(); runs.forEach(r => res.set(r.id, {l: (!r.lend||r.lend==='auto') ? 'endcap' : r.lend, r: (!r.rend||r.rend==='auto') ? 'endcap' : r.rend}));
+  const corners = []; const used = new Set();
+  for (let i=0;i<ends.length;i++){ if (used.has(i)) continue; const grp=[i]; for (let j=i+1;j<ends.length;j++) if (!used.has(j) && dist(ends[i].x,ends[i].y,ends[j].x,ends[j].y) < 3) grp.push(j); grp.forEach(k=>used.add(k)); if (grp.length>=2) corners.push({x:ends[i].x, y:ends[i].y, ends: grp.map(k=>ends[k])}); }
+  let cx=0, cy=0; ends.forEach(e => { cx+=e.x; cy+=e.y; }); cx/=(ends.length||1); cy/=(ends.length||1);
+  const out = [];
+  for (const c of corners) {
+    const key = CK(c.x,c.y); let kind = job.corners[key] || null, auto = !kind;
+    if (!kind) {
+      const dirs = c.ends.slice(0,2).map(e => { const r=e.r, ox = e.e===1? r.x2 : r.x1, oy = e.e===1? r.y2 : r.y1, L = dist(c.x,c.y,ox,oy)||1; return [(ox-c.x)/L, (oy-c.y)/L]; });
+      const bx = dirs[0][0]+dirs[1][0], by = dirs[0][1]+dirs[1][1], bl = Math.hypot(bx,by);
+      if (bl < 0.25) kind = 'seam';                                   // straight joint between two runs
+      else { // bisector points into the corner's angle; if the house (drawing centroid) is in there, it's an outside corner
+        const dot = (bx/bl)*(cx-c.x) + (by/bl)*(cy-c.y); kind = dot > 0 ? 'miter_out' : 'miter_in'; }
+    }
+    out.push({key, x:c.x, y:c.y, kind, auto, groups: [...new Set(c.ends.map(e => e.r.g||0))]});
+    for (const e of c.ends) { const rec = res.get(e.r.id); const manual = e.e===1 ? e.r.lend : e.r.rend; if (!manual || manual==='auto') { if (e.e===1) rec.l = kind; else rec.r = kind; } }
+  }
+  return {ends: res, corners: out};
+}
 
 function drawEndMark(p, x, y, ux, uy, kind, col, w){
   // ux,uy = unit vector pointing INTO the run from this end; perpendicular = (-uy, ux)
@@ -471,34 +518,40 @@ function drawEndMark(p, x, y, ux, uy, kind, col, w){
   else if (kind==='miter_out') p.circle(x, y, 6, {fill:'#fff', color:col, width:3});
   else if (kind==='miter_bay') p.rect(x-6, y-6, 12, 12, {fill:'#fff', color:col, width:3});
   else if (kind==='continues') { p.line(x+ux*2, y+uy*2, x-ux*10, y-uy*10, {color:col, width:w*0.6, dash:[4,4]}); }
+  // 'seam' (straight joint) and 'auto' draw nothing
 }
 function badge(p, x, y, g, size=8){ if(!g) return; p.circle(x, y, size, {fill:GROUPS[g].c, color:NAVY, width:1.5}); p.text(String(g), x, y, {size:size*1.2, bold:true, color: g===1?NAVY:'#fff'}); }
 
 function drawRun(p, r, o){
-  const field = o.field, col = o.invalid?.has(r.id) ? ERR : groupColor(r.g, field);
-  const w = field ? 6 : 4;
-  const dx=r.x2-r.x1, dy=r.y2-r.y1, L=Math.hypot(dx,dy)||1, ux=dx/L, uy=dy/L, px=-uy, py=ux;
+  const field = o.field, dx=r.x2-r.x1, dy=r.y2-r.y1, L=Math.hypot(dx,dy)||1, ux=dx/L, uy=dy/L, px=-uy, py=ux;
+  let ang = Math.atan2(dy,dx); if (ang >= Math.PI/2 - 1e-6 || ang < -Math.PI/2) { ang += Math.PI; }
+  const mx=(r.x1+r.x2)/2, my=(r.y1+r.y2)/2, sgn = (py < 0 || (py===0 && px<0)) ? 1 : -1;
+  if (r.existing) { // existing gutter, not in scope: dashed grey, no end marks, optional length
+    const col = field ? '#444' : '#7a7a7a';
+    if (o.selected===r.id) p.line(r.x1,r.y1,r.x2,r.y2,{color:GOLD, width:14});
+    p.line(r.x1,r.y1,r.x2,r.y2,{color:col, width: field?4:3, dash:[10,8]});
+    p.text(runLabel(r), mx + px*12*sgn, my + py*12*sgn, {size: field?13:11, bold:false, color:col, bg:'#fff', angle:ang});
+    if (o.selected===r.id) { p.circle(r.x1,r.y1,7,{fill:'#fff',color:NAVY,width:2}); p.circle(r.x2,r.y2,7,{fill:'#fff',color:NAVY,width:2}); }
+    return;
+  }
+  const col = o.invalid?.has(r.id) ? ERR : groupColor(r.g, field), w = field ? 6 : 4;
   if (o.selected===r.id) p.line(r.x1,r.y1,r.x2,r.y2,{color:GOLD, width:w+10});
   if (!field && r.g===1) p.line(r.x1,r.y1,r.x2,r.y2,{color:NAVY, width:w+2});
   p.line(r.x1,r.y1,r.x2,r.y2,{color:col, width:w});
   if (r.cover) p.line(r.x1+px*7, r.y1+py*7, r.x2+px*7, r.y2+py*7, {color:col, width:2, dash:[6,4]});
-  drawEndMark(p, r.x1, r.y1, ux, uy, r.lend, col, w);
-  drawEndMark(p, r.x2, r.y2, -ux, -uy, r.rend, col, w);
-  // label, kept upright
-  let ang = Math.atan2(dy,dx); if (ang >= Math.PI/2 - 1e-6 || ang < -Math.PI/2) { ang += Math.PI; }
-  const mx=(r.x1+r.x2)/2, my=(r.y1+r.y2)/2, off = r.cover? 20 : 13;
-  // put the label on the side that is "above" on screen so labels read consistently
-  const sgn = (py < 0 || (py===0 && px<0)) ? 1 : -1;
-  const LX = mx + px*off*sgn, LY = my + py*off*sgn;
-  p.text(runLabel(r), LX, LY, {size: field?15:12, bold:true, color: col, bg:'#fff', angle: ang});
-  if (r.g) badge(p, mx - px*14*sgn, my - py*14*sgn, r.g);
+  const e = o.ends && o.ends.get(r.id) || {l:'endcap', r:'endcap'};
+  drawEndMark(p, r.x1, r.y1, ux, uy, e.l, col, w);
+  drawEndMark(p, r.x2, r.y2, -ux, -uy, e.r, col, w);
+  const off = r.cover ? 20 : 13;
+  p.text(runLabel(r, o.dom), mx + px*off*sgn, my + py*off*sgn, {size: field?15:12, bold:true, color: col, bg:'#fff', angle: ang});
+  if (r.g) badge(p, mx - px*12*sgn, my - py*12*sgn, r.g, 6.5);
   if (o.selected===r.id) { p.circle(r.x1,r.y1,7,{fill:'#fff',color:NAVY,width:2}); p.circle(r.x2,r.y2,7,{fill:'#fff',color:NAVY,width:2}); }
 }
 function drawDS(p, d, o){
   const field=o.field, col = o.invalid?.has(d.id) ? ERR : groupColor(d.g, field), s=16;
   if (o.selected===d.id) p.circle(d.x,d.y,s*1.1,{fill:GOLD});
   p.rect(d.x-s/2, d.y-s/2, s, s, {fill:col, color: d.g===1?NAVY:undefined, width:1.5});
-  p.text(`${d.seq||'?'} ${d.story||'?'}st`, d.x, d.y+s/2+10, {size: field?14:11, bold:true, color:col, bg:'#fff'});
+  p.text(`${seqText(d.seq)||'?'} ${d.story||'?'}st`, d.x, d.y+s/2+10, {size: field?14:11, bold:true, color:col, bg:'#fff'});
   if (!field && d.size && d.size!=='3x4') p.text(d.size, d.x, d.y+s/2+23, {size:9, color:col, bg:'#fff'});
   if (d.g) badge(p, d.x+s/2+4, d.y-s/2-4, d.g, 7);
 }
@@ -535,9 +588,9 @@ function drawText(p, t, o){
   if (o.selected===t.id) p.circle(t.lx,t.ly,7,{fill:'#fff',color:NAVY,width:2});
 }
 function drawScene(p, o){
-  const order = ['ink','run','ds','acc','haz','text'];
-  for (const ty of order) for (const it of job.items) if (it.type===ty) {
-    if (ty==='run') drawRun(p,it,o); else if (ty==='ds') drawDS(p,it,o); else if (ty==='acc') drawAcc(p,it,o); else if (ty==='haz') drawHaz(p,it,o); else if (ty==='ink') drawInk(p,it,o); else drawText(p,it,o);
+  const order = ['ink','xrun','run','ds','acc','haz','text'];
+  for (const ty of order) for (const it of job.items) if ((ty==='xrun' && it.type==='run' && it.existing) || (it.type===ty && !(ty==='run' && it.existing))) {
+    const k = it.type; if (k==='run') drawRun(p,it,o); else if (k==='ds') drawDS(p,it,o); else if (k==='acc') drawAcc(p,it,o); else if (k==='haz') drawHaz(p,it,o); else if (k==='ink') drawInk(p,it,o); else drawText(p,it,o);
   }
 }
 function drawPins(p, o){
@@ -557,8 +610,10 @@ function render(){
   const v = job.view; ctx.save(); ctx.translate(v.tx,v.ty); ctx.scale(v.s,v.s);
   if (job.bg.type==='image') { const rec = imgCache.get(job.bg.imgId); if (rec) canvasPainter(ctx).image(rec.img, job.bg.x||0, job.bg.y||0, job.bg.w, job.bg.h, job.bg.rot||0); else drawGrid(ctx); } else drawGrid(ctx);
   const p = canvasPainter(ctx);
-  const o = {field:isField(), selected:sel, invalid: invalidSet(), highlightPin};
+  const rs = resolveEnds();
+  const o = {field:isField(), selected:sel, invalid: invalidSet(), highlightPin, ends: rs.ends, dom: dominantProfile()};
   drawScene(p, o);
+  if (!o.field && tool==='select') for (const c of rs.corners) if (c.kind!=='seam') p.circle(c.x, c.y, 11, {color: c.auto ? 'rgba(0,23,56,0.25)' : GOLD, width:2});
   drawPins(p, o);
   // previews
   if (runPreview) { p.line(runPreview.x1,runPreview.y1,runPreview.x2,runPreview.y2,{color:'#888',width:4,dash:[8,6]}); const L = Math.hypot(runPreview.x2-runPreview.x1, runPreview.y2-runPreview.y1); }
@@ -576,25 +631,27 @@ let lastEnd = null;        // end of last run drawn
 let lastTouch = null;      // last canvas point touched (photo pin location)
 let inkColor = '#000000', inkW = 3;
 let curGroup = 0;
+let fieldExisting = false;   // Field Mode toggle: runs drawn are existing gutter (not in scope)
+const isExistingTool = () => tool==='run' && (toolSub==='existing' || (isField() && fieldExisting));
 
 function setTool(t, sub){
   tool = t; toolSub = sub || null; pendingStart = null; runPreview = null;
   if (t !== 'select') { sel = null; hideProps(); }
   if (t === 'run' && lastEnd) pendingStart = {...lastEnd, fromLast:true};
   $$('[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool===t && (!b.dataset.sub || b.dataset.sub===sub)));
-  $('#fRun').classList.toggle('active', t==='run'); $('#fDs').classList.toggle('active', t==='ds');
+  $('#fRun').classList.toggle('active', t==='run'); $('#fDs').classList.toggle('active', t==='ds'); const fe=$('#fExist'); if (fe) fe.classList.toggle('active', fieldExisting);
   updateHints(); render();
 }
 function updateHints(){
   const h = $('#fieldHint'), cb = $('#contBar');
   let hint = '';
-  if (tool==='run') hint = pendingStart ? (pendingStart.fromLast ? 'TAP END POINT (continues from last run)' : 'TAP END POINT') : 'TAP START POINT';
+  if (tool==='run') { hint = pendingStart ? (pendingStart.fromLast ? 'TAP END POINT (continues from last run)' : 'TAP END POINT') : 'TAP START POINT'; if (isExistingTool()) hint += ' — EXISTING GUTTER'; }
   else if (tool==='ds') hint = 'TAP WHERE THE DOWNSPOUT GOES';
   else if (tool==='acc') hint = 'Tap to place ' + ACC[toolSub].n;
   else if (tool==='haz') hint = 'Tap to place ' + HAZ[toolSub].n;
   else if (tool==='text') hint = 'Tap where the note points';
   else if (tool==='ink') hint = 'Draw with the Pencil';
-  else if (tool==='select') hint = 'Tap an item to edit it';
+  else if (tool==='select') hint = 'Tap an item to edit it · tap a corner to flip its miter';
   h.textContent = isField() ? hint : '';
   const showCont = tool==='run' && pendingStart && pendingStart.fromLast;
   cb.classList.toggle('hidden', !showCont);
@@ -658,6 +715,7 @@ function beginGesture(w, e){
       if (it.type==='text' && dist(w.x,w.y,it.lx,it.ly)<hr) return {kind:'anchor', it};
     }
     const pin = hitPin(w.x,w.y); if (pin) return {kind:'pin', pin, ox:pin.x, oy:pin.y, start:w, snap:false};
+    const corner = resolveEnds().corners.find(c => c.kind!=='seam' && dist(w.x,w.y,c.x,c.y) < 14/job.view.s); if (corner) return {kind:'corner', corner};
     const hit = hitTest(w.x,w.y);
     if (hit) return {kind:'move', it:hit, start:w, orig:JSON.stringify(hit), snapped:false};
     return {kind:'pan', v0:{...job.view}};
@@ -698,6 +756,7 @@ function endPointer(e){
   if (g.kind==='rundrag') { runPreview = null; if (p.moved) { const s2 = snapPt(w.x,w.y); if (dist(g.start.x,g.start.y,s2.x,s2.y) > 4) { openLengthPad(g.start, s2); return; } } else { tapRun(w); } render(); return; }
   if (g.kind==='move' || g.kind==='endpoint' || g.kind==='anchor') { if (p.moved) { afterItemsChanged(); showProps(); } else if (g.kind==='move') { if (tap) { sel = g.it.id; showProps(); render(); } } return; }
   if (g.kind==='pin') { if (p.moved) { touch(); render(); } else if (tap) openPhotoViewer(g.pin.id); return; }
+  if (g.kind==='corner') { if (tap) cycleCorner(g.corner); return; }
   if (g.kind==='pan' && tap) handleTap(w, e);
 }
 cv.addEventListener('pointerup', endPointer);
@@ -712,8 +771,18 @@ function handleTap(w, e){
   if (tool==='acc') { snapshot(); job.items.push({type:'acc', sub:toolSub, id:uid(), g:curGroup, x:w.x, y:w.y, rot:0}); afterItemsChanged(); return; }
   if (tool==='haz') { snapshot(); job.items.push({type:'haz', sub:toolSub, id:uid(), x:w.x, y:w.y}); afterItemsChanged(); return; }
   if (tool==='text') return openTextSheet(w, null);
-  if (tool==='select') { const pin = hitPin(w.x,w.y); if (pin) return openPhotoViewer(pin.id); const hit = hitTest(w.x,w.y); sel = hit ? hit.id : null; if (sel) showProps(); else hideProps(); render(); return; }
+  if (tool==='select') { const pin = hitPin(w.x,w.y); if (pin) return openPhotoViewer(pin.id);
+    const corner = resolveEnds().corners.find(c => c.kind!=='seam' && dist(w.x,w.y,c.x,c.y) < 14/job.view.s); if (corner) return cycleCorner(corner);
+    const hit = hitTest(w.x,w.y); sel = hit ? hit.id : null; if (sel) showProps(); else hideProps(); render(); return; }
   if (!tool) { const pin = hitPin(w.x,w.y); if (pin && !isField()) openPhotoViewer(pin.id); }
+}
+function cycleCorner(c){ // auto -> inside -> outside -> bay -> auto
+  // auto -> the opposite miter -> bay -> back to auto
+  const cur = job.corners[c.key]; let next;
+  if (!cur) next = c.kind==='miter_in' ? 'miter_out' : 'miter_in'; else if (cur==='miter_bay') next = null; else next = 'miter_bay';
+  if (next) job.corners[c.key] = next; else delete job.corners[c.key];
+  toast('Corner: ' + (next ? endLabel(next) : 'auto (' + endLabel(resolveEnds().corners.find(x=>x.key===c.key)?.kind || 'endcap') + ')'));
+  renderMaterials(); touch(); render();
 }
 function tapRun(w){
   if (!pendingStart) { pendingStart = snapPt(w.x,w.y); updateHints(); render(); return; }
@@ -721,9 +790,10 @@ function tapRun(w){
   if (dist(end.x,end.y,pendingStart.x,pendingStart.y) < 4) { toast('Tap a different end point'); return; }
   openLengthPad({...pendingStart}, end);
 }
-function commitRun(start, end, len){
+function commitRun(start, end, len, existing){
   snapshot(); const d = job.defaults;
-  job.items.push({type:'run', id:uid(), g:curGroup, x1:start.x, y1:start.y, x2:end.x, y2:end.y, len, profile:d.profile, cover:d.cover, story:d.story, lend:d.lend, rend:d.rend});
+  if (existing) job.items.push({type:'run', existing:true, id:uid(), g:0, x1:start.x, y1:start.y, x2:end.x, y2:end.y, len: len||0});
+  else job.items.push({type:'run', id:uid(), g:curGroup, x1:start.x, y1:start.y, x2:end.x, y2:end.y, len, profile:d.profile, cover:d.cover, story:d.story, lend:'auto', rend:'auto'});
   lastEnd = {x:end.x, y:end.y}; pendingStart = {...lastEnd, fromLast:true};
   afterItemsChanged();
 }
@@ -742,40 +812,42 @@ function segVal(root, name){ const b = root.querySelector(`[data-seg="${name}"] 
 
 function openLengthPad(start, end, existing){
   let val = existing ? String(existing.len||'') : '';
-  const ov = openSheet(`<div id="numpad"><h3>${existing?'Edit length (ft)':'Run length (ft)'}</h3><div class="disp" id="npDisp">0</div>
+  const xg = existing ? !!existing.existing : isExistingTool();   // existing-gutter run: length optional
+  const ov = openSheet(`<div id="numpad"><h3>${xg?'Existing gutter — length (optional)':(existing?'Edit length (ft)':'Run length (ft)')}</h3><div class="disp" id="npDisp">0</div>
     <div class="keys">${[7,8,9,4,5,6,1,2,3].map(n=>`<button class="btn" data-k="${n}">${n}</button>`).join('')}
     <button class="btn" data-k=".">.</button><button class="btn" data-k="0">0</button><button class="btn op" data-k="bs">⌫</button>
     <button class="btn done" data-k="done">DONE</button></div>
-    <div class="actions"><button class="btn ghost" data-k="cancel">Cancel</button></div></div>`, {dismiss:false});
+    <div class="actions">${xg?'<button class="btn" data-k="skip">NO LENGTH</button>':''}<button class="btn ghost" data-k="cancel">Cancel</button></div></div>`, {dismiss:false});
   const disp = ov.querySelector('#npDisp'); const show = () => disp.textContent = val || '0';
   show();
   ov.addEventListener('click', e => { const b = e.target.closest('[data-k]'); if (!b) return; const k = b.dataset.k;
     if (k==='bs') val = val.slice(0,-1); else if (k==='cancel') { closeSheet(); render(); }
-    else if (k==='done') { const n = parseFloat(val); if (!(n>0)) { toast('Enter a length greater than 0'); return; } closeSheet(); if (existing) { snapshot(); existing.len = n; afterItemsChanged(); showProps(); } else commitRun(start, end, n); }
+    else if (k==='skip') { closeSheet(); if (existing) { snapshot(); existing.len = 0; afterItemsChanged(); showProps(); } else commitRun(start, end, 0, true); }
+    else if (k==='done') { const n = parseFloat(val); if (!(n>0)) { if (xg) { ov.querySelector('[data-k="skip"]').click(); return; } toast('Enter a length greater than 0'); return; } closeSheet(); if (existing) { snapshot(); existing.len = n; afterItemsChanged(); showProps(); } else commitRun(start, end, n, xg); }
     else if (k==='.') { if (!val.includes('.')) val = (val||'0') + '.'; } else if (val.replace('.','').length < 5) val += k;
     show(); });
 }
 
 function openDsSheet(w, existing){
   const d = job.defaults; const field = isField();
-  const cur = existing || {size:d.dsSize, story:d.dsStory, seq:'', term:d.dsTerm, note:'', g:curGroup};
-  let seq = cur.seq || '';
+  const cur = existing || {size:d.dsSize, story:d.dsStory, seq:[], term:d.dsTerm, note:'', g:curGroup};
+  let seq = Array.isArray(cur.seq) ? [...cur.seq] : [];
   const ov = openSheet(`<h3>${existing?'Edit downspout':'Downspout'}</h3>
     ${field?'':`<div class="row"><label class="l">Size</label>${segHTML('size', DS_SIZES, cur.size)}</div>`}
-    <div class="row"><label class="l">Story</label>${segHTML('story', [[1,'1 story'],[2,'2 story']], cur.story, true)}</div>
-    <div class="row"><label class="l">Elbows (tap in order)</label>
-      <div class="seg big"><button class="btn" data-e="A">A</button><button class="btn" data-e="B">B</button><button class="btn" data-e="bs">⌫</button></div>
-      <div class="seqbox" id="seqBox">${esc(seq)}</div></div>
+    <div class="row"><label class="l">Story</label>${segHTML('story', STORIES.map(s=>[s, s+' story']), cur.story, true)}</div>
+    <div class="row"><label class="l">Elbows &amp; offsets (tap in order, top to bottom)</label>
+      <div class="seg big" id="seqKeys">${SEQ_TOKENS.map(t=>`<button class="btn" data-e="${esc(t)}">${esc(t)}</button>`).join('')}<button class="btn" data-e="bs">⌫</button></div>
+      <div class="seqbox" id="seqBox">${esc(seqText(seq))}</div></div>
     ${field?'':`<div class="row"><label class="l">Termination</label>${segHTML('term', TERMS, cur.term)}</div>
     <div class="row"><label class="l">Note</label><input type="text" id="dsNote" value="${esc(cur.note||'')}" placeholder="optional"></div>
     <div class="row"><label class="l">Group</label>${segHTML('g', GROUPS.map((g,i)=>[i,g.n]), cur.g??0)}</div>`}
     <div class="actions"><button class="btn ghost" id="dsCancel">Cancel</button><button class="btn gold" id="dsDone">DONE</button></div>`, {onCancel:()=>render()});
   const box = ov.querySelector('#seqBox');
-  ov.querySelector('[data-e="A"]').parentElement.addEventListener('click', e => { const b=e.target.closest('[data-e]'); if(!b) return; if (b.dataset.e==='bs') seq = seq.slice(0,-1); else if (seq.length<8) seq += b.dataset.e; box.textContent = seq; });
+  ov.querySelector('#seqKeys').addEventListener('click', e => { const b=e.target.closest('[data-e]'); if(!b) return; if (b.dataset.e==='bs') seq.pop(); else if (seq.length<12) seq.push(b.dataset.e); box.textContent = seqText(seq); });
   ov.querySelector('#dsCancel').onclick = () => { closeSheet(); render(); };
   ov.querySelector('#dsDone').onclick = () => {
     const story = +segVal(ov,'story'); const size = field ? cur.size : segVal(ov,'size'); const term = field ? cur.term : segVal(ov,'term'); const note = field ? (cur.note||'') : ov.querySelector('#dsNote').value.trim(); const g = field ? (cur.g??0) : +segVal(ov,'g');
-    if (!seq) { toast('Enter the elbow sequence (A / B)'); return; }
+    if (!seq.length) { toast('Enter the elbow sequence (A / B / offsets)'); return; }
     closeSheet(); snapshot();
     if (existing) Object.assign(existing, {story,size,term,note,seq,g}); else job.items.push({type:'ds', id:uid(), g, x:w.x, y:w.y, size, story, seq, term, note});
     Object.assign(job.defaults, {dsSize:size, dsStory:story, dsTerm:term});
@@ -784,8 +856,10 @@ function openDsSheet(w, existing){
 }
 function openTextSheet(w, existing){
   const ov = openSheet(`<h3>${existing?'Edit note':'Text callout'}</h3><div class="row"><input type="text" id="txtIn" value="${esc(existing?existing.text:'')}" placeholder="Short note" maxlength="60"></div>
+    <div class="row seg">${CALLOUT_PRESETS.map(t=>`<button class="btn" data-preset="${esc(t)}">${esc(t)}</button>`).join('')}</div>
     <div class="actions"><button class="btn ghost" id="txCancel">Cancel</button><button class="btn gold" id="txDone">DONE</button></div>`, {onCancel:()=>render()});
   const inp = ov.querySelector('#txtIn'); setTimeout(()=>inp.focus(), 50);
+  ov.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => { inp.value = b.dataset.preset; });
   const done = () => { const t = inp.value.trim(); if (!t) { toast('Type a note'); return; } closeSheet(); snapshot(); if (existing) existing.text = t; else job.items.push({type:'text', id:uid(), g:curGroup, text:t, lx:w.x, ly:w.y, x:w.x+60, y:w.y-50}); afterItemsChanged(); if (existing) showProps(); };
   ov.querySelector('#txDone').onclick = done; inp.addEventListener('keydown', e => { if (e.key==='Enter') done(); });
   ov.querySelector('#txCancel').onclick = () => { closeSheet(); render(); };
@@ -796,18 +870,20 @@ function confirmSheet(msg, okLabel, cb){ const ov = openSheet(`<h3>${esc(msg)}</
 function hideProps(){ $('#props').classList.add('hidden'); }
 function showProps(){
   const it = job.items.find(i => i.id===sel); const el = $('#props'); if (!it || isField()) return hideProps();
-  const grp = it.type==='haz' ? '' : `<div class="row"><label class="l">Group</label>${segHTML('g', GROUPS.map((g,i)=>[i,g.short]), it.g??0)}</div>`;
+  const grp = (it.type==='haz' || (it.type==='run' && it.existing)) ? '' : `<div class="row"><label class="l">Group</label>${segHTML('g', GROUPS.map((g,i)=>[i,g.short]), it.g??0)}</div>`;
   let body = '';
-  if (it.type==='run') body = `<div class="row"><label class="l">Length (ft)</label><input type="number" inputmode="decimal" id="pLen" value="${it.len||''}" step="0.5"><button class="btn sm" id="pPad">Pad</button></div>
+  const rsv = it.type==='run' && !it.existing ? (resolveEnds().ends.get(it.id) || {l:'endcap', r:'endcap'}) : null;
+  if (it.type==='run' && it.existing) body = `<div class="row"><b>Existing gutter — not in scope, not counted</b></div><div class="row"><label class="l">Length (ft, optional)</label><input type="number" inputmode="decimal" id="pLen" value="${it.len||''}" step="0.5"><button class="btn sm" id="pPad">Pad</button></div>`;
+  else if (it.type==='run') body = `<div class="row"><label class="l">Length (ft)</label><input type="number" inputmode="decimal" id="pLen" value="${it.len||''}" step="0.5"><button class="btn sm" id="pPad">Pad</button></div>
     <div class="row"><label class="l">Profile</label>${segHTML('profile', PROFILES, it.profile)}</div>
     <div class="row"><label class="l">Gutter cover</label>${segHTML('cover', [['0','Off'],['1','On']], it.cover?'1':'0')}</div>
     <div class="row"><label class="l">Story</label>${segHTML('story', [[1,'1'],[2,'2']], it.story)}</div>
-    <div class="row"><label class="l">Left end (start)</label>${segHTML('lend', ENDS, it.lend)}</div>
-    <div class="row"><label class="l">Right end (finish)</label>${segHTML('rend', ENDS, it.rend)}</div>`;
-  else if (it.type==='ds') body = `<div class="row"><b>${esc(it.size)} · ${esc(it.seq||'?')} · ${it.story}st · ${esc(termLabel(it.term))}</b></div><div class="row">${it.note?esc(it.note):''}</div><div class="row"><button class="btn" id="pEditDs">Edit fields</button></div>`;
+    <div class="row"><label class="l">Start end — now: ${esc(endLabel(rsv.l))}</label>${segHTML('lend', ENDS, it.lend||'auto')}</div>
+    <div class="row"><label class="l">Finish end — now: ${esc(endLabel(rsv.r))}</label>${segHTML('rend', ENDS, it.rend||'auto')}</div>`;
+  else if (it.type==='ds') body = `<div class="row"><b>${esc(it.size)} · ${esc(seqText(it.seq)||'?')} · ${it.story}st · ${esc(termLabel(it.term))}</b></div><div class="row">${it.note?esc(it.note):''}</div><div class="row"><button class="btn" id="pEditDs">Edit fields</button></div>`;
   else if (it.type==='text') body = `<div class="row"><b>${esc(it.text)}</b></div><div class="row"><button class="btn" id="pEditTx">Edit text</button></div>`;
   else if (it.type==='ink') body = `<div class="row"><label class="l">Color</label>${segHTML('color', [['#000000','Black'],['#001738','Navy'],['#F15D22','Red-orange']], it.color)}</div><div class="row"><label class="l">Width</label>${segHTML('w', [[3,'Thin'],[7,'Thick']], it.w)}</div>`;
-  const title = it.type==='run'?'Gutter run': it.type==='ds'?'Downspout': it.type==='acc'?ACC[it.sub].n: it.type==='haz'?HAZ[it.sub].n: it.type==='ink'?'Ink stroke':'Text callout';
+  const title = it.type==='run'?(it.existing?'Existing gutter':'Gutter run'): it.type==='ds'?'Downspout': it.type==='acc'?ACC[it.sub].n: it.type==='haz'?HAZ[it.sub].n: it.type==='ink'?'Ink stroke':'Text callout';
   el.innerHTML = `<h3>${esc(title)}</h3>${grp}${body}<div class="actions" style="justify-content:space-between">${['acc','ds'].includes(it.type)?'<button class="btn" id="pRot">Rotate</button>':'<span></span>'}<span><button class="btn red" id="pDel">Delete</button> <button class="btn ghost" id="pClose">Close</button></span></div>`;
   el.classList.remove('hidden');
   const upd = (fn) => { snapshot(); fn(); afterItemsChanged(); };
@@ -815,11 +891,13 @@ function showProps(){
   if (it.type==='run') {
     const len = el.querySelector('#pLen'); len.addEventListener('change', () => { const n = parseFloat(len.value); upd(()=> it.len = n>0?n:0); });
     el.querySelector('#pPad').onclick = () => openLengthPad(null,null,it);
+  }
+  if (it.type==='run' && !it.existing) {
     wireSeg(el,'profile', v => upd(()=>{ it.profile=v; job.defaults.profile=v; }));
     wireSeg(el,'cover', v => upd(()=>{ it.cover=v==='1'; job.defaults.cover=it.cover; }));
     wireSeg(el,'story', v => upd(()=>{ it.story=+v; job.defaults.story=+v; }));
-    wireSeg(el,'lend', v => upd(()=>{ it.lend=v; job.defaults.lend=v; }));
-    wireSeg(el,'rend', v => upd(()=>{ it.rend=v; job.defaults.rend=v; }));
+    wireSeg(el,'lend', v => upd(()=>{ it.lend=v; }));
+    wireSeg(el,'rend', v => upd(()=>{ it.rend=v; }));
   }
   if (it.type==='ds') el.querySelector('#pEditDs').onclick = () => openDsSheet(null, it);
   if (it.type==='text') el.querySelector('#pEditTx').onclick = () => openTextSheet(null, it);
@@ -840,11 +918,12 @@ function setMode(m, silent){
 $('#fFinish').onclick = () => setMode('full');
 $('#tField').onclick = () => setMode('field');
 $('#fRun').onclick = () => setTool(tool==='run'?null:'run');
+$('#fExist').onclick = () => { fieldExisting = !fieldExisting; toast(fieldExisting ? 'Runs will be marked EXISTING (dashed)' : 'Runs are new gutter'); if (tool!=='run') setTool('run'); else { pendingStart = pendingStart; updateHints(); render(); } $('#fExist').classList.toggle('active', fieldExisting); };
 $('#fDs').onclick = () => setTool(tool==='ds'?null:'ds');
 $('#fUndo').onclick = undo; $('#tUndo').onclick = undo; $('#tRedo').onclick = redo;
 $('#fJobs').onclick = openJobs; $('#tJobs').onclick = openJobs;
 $('#tNew').onclick = () => confirmSheet('Start a new job? The current job stays saved in Jobs.', 'New job', () => { flushSave(); const j = newJob(); addJobToStore(j); openJob(j.id); });
-$$('[data-tool]').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool, b.dataset.sub)));
+$$('[data-tool]').forEach(b => b.addEventListener('click', () => { fieldExisting = false; setTool(b.dataset.tool, b.dataset.sub); }));
 $$('[data-ink]').forEach(b => b.addEventListener('click', () => { inkColor = b.dataset.ink; $$('[data-ink]').forEach(x=>x.classList.toggle('active', x===b)); setTool('ink'); }));
 $$('[data-inkw]').forEach(b => b.addEventListener('click', () => { inkW = +b.dataset.inkw; $$('[data-inkw]').forEach(x=>x.classList.toggle('active', x===b)); setTool('ink'); }));
 $('[data-ink="#000000"]').classList.add('active'); $('[data-inkw="3"]').classList.add('active');
@@ -917,30 +996,36 @@ $('#bgInput').addEventListener('change', async e => {
 });
 
 /* ---------------- validation ---------------- */
-function invalidSet(){ const s = new Set(); if (!job) return s; for (const it of job.items) { if (it.type==='run' && !(it.len>0)) s.add(it.id); if (it.type==='ds' && !(it.size && it.story && it.seq && it.term)) s.add(it.id); } return s; }
+function invalidSet(){ const s = new Set(); if (!job) return s; for (const it of job.items) { if (it.type==='run' && !it.existing && !(it.len>0)) s.add(it.id); if (it.type==='ds' && !(it.size && it.story && it.seq && it.seq.length && it.term)) s.add(it.id); } return s; }
 function validationProblems(){
   const probs = [];
   if (!job.customer.trim()) probs.push('Customer name is blank');
   if (!job.address.trim()) probs.push('Address is blank');
-  let r=0, d=0; for (const it of job.items) { if (it.type==='run' && !(it.len>0)) r++; if (it.type==='ds') { const miss=[]; if(!it.size) miss.push('size'); if(!it.story) miss.push('story'); if(!it.seq) miss.push('elbow sequence'); if(!it.term) miss.push('termination'); if (miss.length) d++; } }
+  let r=0, d=0; for (const it of job.items) { if (it.type==='run' && !it.existing && !(it.len>0)) r++; if (it.type==='ds') { const miss=[]; if(!it.size) miss.push('size'); if(!it.story) miss.push('story'); if(!it.seq || !it.seq.length) miss.push('elbow sequence'); if(!it.term) miss.push('termination'); if (miss.length) d++; } }
   if (r) probs.push(`${r} gutter run${r>1?'s':''} with no length (shown in red)`);
   if (d) probs.push(`${d} downspout${d>1?'s':''} missing size / story / elbows / termination (shown in red)`);
-  if (!job.items.some(i=>i.type==='run')) probs.push('No gutter runs on the drawing');
+  if (!job.items.some(i=>i.type==='run' && !i.existing)) probs.push('No new gutter runs on the drawing');
   return probs;
 }
 
 /* ---------------- material list ---------------- */
 let matTab = 'all';
 function activeGroups(){ const s = new Set(job.items.filter(i=>i.type!=='haz').map(i=>i.g||0)); return [...s].sort(); }
-function computeMaterials(gFilter){ // gFilter: 'all' or group index
-  const items = job.items.filter(i => gFilter==='all' || (i.g||0)===+gFilter);
-  const m = {gutter:{}, coverLF:0, endcaps:0, miterIn:0, miterOut:0, miterBay:0, ds:0, dsBySize:{}, dsByStory:{1:0,2:0}, elbA:0, elbB:0, outlets:0, straps:0, acc:{splashguard:0,splashblock:0,offset:0,dripedge:0,rainchain:0}, rainchainTerm:0};
+function computeMaterials(gFilter, rs){ // gFilter: 'all' or group index; rs = resolveEnds() (optional)
+  rs = rs || resolveEnds();
+  const inG = it => gFilter==='all' || (it.g||0)===+gFilter;
+  const items = job.items.filter(i => inG(i) && !(i.type==='run' && i.existing));
+  const m = {gutter:{}, coverLF:0, endcaps:0, miterIn:0, miterOut:0, miterBay:0, ds:0, dsBySize:{}, dsByStory:{}, elbA:0, elbB:0, offsets:{'2"':0,'4"':0,'6"':0}, outlets:0, straps:0, acc:{splashguard:0,splashblock:0,offset:0,dripedge:0,rainchain:0}, rainchainTerm:0};
   for (const it of items) {
     if (it.type==='run') { const L = +it.len||0; m.gutter[it.profile||'?'] = (m.gutter[it.profile||'?']||0) + L; if (it.cover) m.coverLF += L;
-      for (const e of [it.lend, it.rend]) { if (e==='endcap') m.endcaps++; else if (e==='miter_in') m.miterIn++; else if (e==='miter_out') m.miterOut++; else if (e==='miter_bay') m.miterBay++; } }
-    else if (it.type==='ds') { m.ds++; m.dsBySize[it.size||'?'] = (m.dsBySize[it.size||'?']||0)+1; m.dsByStory[it.story||1]++; const s=(it.seq||'').toUpperCase(); m.elbA += (s.match(/A/g)||[]).length; m.elbB += (s.match(/B/g)||[]).length; m.straps += it.story===2?4:2; if (it.term==='rainchain') m.rainchainTerm++; }
+      const e = rs.ends.get(it.id) || {l:'endcap', r:'endcap'}; if (e.l==='endcap') m.endcaps++; if (e.r==='endcap') m.endcaps++; }
+    else if (it.type==='ds') { m.ds++; m.dsBySize[it.size||'?'] = (m.dsBySize[it.size||'?']||0)+1; const st = it.story||1; m.dsByStory[st] = (m.dsByStory[st]||0)+1;
+      for (const t of (it.seq||[])) { if (t==='A') m.elbA++; else if (t==='B') m.elbB++; else if (m.offsets[t]!==undefined) m.offsets[t]++; }
+      m.straps += STRAPS[st] || 2; if (it.term==='rainchain') m.rainchainTerm++; }
     else if (it.type==='acc') m.acc[it.sub]++;
   }
+  // miters are counted per corner (a shared endpoint), not per run end
+  for (const c of rs.corners) { if (gFilter!=='all' && !c.groups.includes(+gFilter)) continue; if (c.kind==='miter_in') m.miterIn++; else if (c.kind==='miter_out') m.miterOut++; else if (c.kind==='miter_bay') m.miterBay++; }
   m.outlets = m.ds; return m;
 }
 const fmtLF = n => (Math.round(n*10)/10) + "'";
@@ -951,7 +1036,7 @@ function renderMaterials(){
   if (!tabs.find(t=>t[0]===matTab)) matTab = 'all';
   $('#mTabs').innerHTML = tabs.map(t=>`<button class="btn ${matTab===t[0]?'active':''}" data-mt="${t[0]}">${t[1]}</button>`).join('');
   $$('#mTabs [data-mt]').forEach(b => b.onclick = () => { matTab = b.dataset.mt; renderMaterials(); });
-  const m = computeMaterials(matTab); const per = hasOpts && matTab==='all' ? groups.map(g => [g, computeMaterials(g)]) : null;
+  const rs = resolveEnds(); const m = computeMaterials(matTab, rs); const per = hasOpts && matTab==='all' ? groups.map(g => [g, computeMaterials(g, rs)]) : null;
   const sub = (fn) => per ? per.map(([g,mm]) => { const v = fn(mm); return v ? `<tr class="sub"><td>${GROUPS[g].n}</td><td>${v}</td></tr>` : ''; }).join('') : '';
   const row = (label, val, fn) => `<tr><td>${label}</td><td>${val}</td></tr>${fn?sub(fn):''}`;
   const strapKey = String(matTab); const ov = job.manual.straps[strapKey];
@@ -963,11 +1048,12 @@ function renderMaterials(){
   html += row('Miters — inside', m.miterIn, mm => mm.miterIn||'') + row('Miters — outside', m.miterOut, mm => mm.miterOut||'') + row('Miters — bay', m.miterBay, mm => mm.miterBay||'');
   html += row('Downspouts', m.ds, mm => mm.ds||'');
   for (const s of Object.keys(m.dsBySize)) html += `<tr class="sub"><td>&nbsp;&nbsp;${esc(s)}</td><td>${m.dsBySize[s]}</td></tr>`;
-  html += `<tr class="sub"><td>&nbsp;&nbsp;1 story / 2 story</td><td>${m.dsByStory[1]} / ${m.dsByStory[2]}</td></tr>`;
+  for (const st of Object.keys(m.dsByStory).sort((a,b)=>a-b)) html += `<tr class="sub"><td>&nbsp;&nbsp;${st} story</td><td>${m.dsByStory[st]}</td></tr>`;
   html += row('Elbows A', m.elbA, mm => mm.elbA||'') + row('Elbows B', m.elbB, mm => mm.elbB||'');
+  for (const sz of OFFSET_SIZES) html += row(`Offsets ${sz}`, m.offsets[sz], mm => mm.offsets[sz]||'');
   html += row('Outlets', m.outlets, mm => mm.outlets||'');
-  html += `<tr><td>Pipe straps <span style="font-size:11px;color:#555">(auto ${m.straps})</span></td><td><input type="number" inputmode="numeric" id="strapOv" placeholder="${m.straps}" value="${ov??''}"></td></tr>`;
-  html += row('Splash guards', m.acc.splashguard, mm => mm.acc.splashguard||'') + row('Splash blocks', m.acc.splashblock, mm => mm.acc.splashblock||'') + row('Rain chains', m.acc.rainchain + m.rainchainTerm, mm => (mm.acc.rainchain+mm.rainchainTerm)||'') + row('Drip edge extensions', m.acc.dripedge, mm => mm.acc.dripedge||'') + row('Offsets / jogs (drawn)', m.acc.offset, mm => mm.acc.offset||'');
+  html += `<tr><td>Pipe bands <span style="font-size:11px;color:#555">(auto ${m.straps})</span></td><td><input type="number" inputmode="numeric" id="strapOv" placeholder="${m.straps}" value="${ov??''}"></td></tr>`;
+  html += row('Splash guards', m.acc.splashguard, mm => mm.acc.splashguard||'') + row('Splash blocks', m.acc.splashblock, mm => mm.acc.splashblock||'') + row('Rain chains', m.acc.rainchain + m.rainchainTerm, mm => (mm.acc.rainchain+mm.rainchainTerm)||'') + row('Drip edge extensions', m.acc.dripedge, mm => mm.acc.dripedge||'');
   html += `</table>`;
   $('#mAuto').innerHTML = html;
   $('#strapOv').addEventListener('change', e => { const v = e.target.value.trim(); if (v==='') delete job.manual.straps[strapKey]; else job.manual.straps[strapKey] = +v; touch(); });
@@ -979,7 +1065,6 @@ function renderMaterials(){
     <label>Hanger qty<input type="number" inputmode="numeric" data-m="hangerQty" value="${esc(mn.hangerQty)}"></label>
     <label>Zip screws<input type="number" inputmode="numeric" data-m="zipScrews" value="${esc(mn.zipScrews)}"></label>
     <label>Flex pipes<input type="number" inputmode="numeric" data-m="flexPipes" value="${esc(mn.flexPipes)}"></label>
-    <label>Offsets (qty)<input type="number" inputmode="numeric" data-m="offsets" value="${esc(mn.offsets)}"></label>
     <label>Spray paint<input data-m="sprayPaint" value="${esc(mn.sprayPaint)}" placeholder="color / cans"></label>
     <label class="full">Additional notes<textarea data-m="notes" rows="3">${esc(mn.notes)}</textarea></label></div>`;
   $$('#mManual [data-m]').forEach(el => el.addEventListener('input', () => { job.manual[el.dataset.m] = el.value; touch(); }));
@@ -1016,7 +1101,7 @@ function exportPNG(){
   const bb = sceneBBox(); const k = Math.min(3, 3000/bb.w, 3000/bb.h); const c = document.createElement('canvas'); c.width = Math.round(bb.w*k); c.height = Math.round(bb.h*k); const x = c.getContext('2d');
   x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height); x.scale(k,k); x.translate(-bb.x,-bb.y);
   const p = canvasPainter(x); const fp = bgFootprint(); if (fp) p.image(imgCache.get(job.bg.imgId).img, job.bg.x||0, job.bg.y||0, job.bg.w, job.bg.h, job.bg.rot||0);
-  const o = {field:false, selected:null, invalid:new Set()}; drawScene(p,o); drawPins(p,o); drawLegendCanvas(x, bb);
+  const rs = resolveEnds(); const o = {field:false, selected:null, invalid:new Set(), ends: rs.ends, dom: dominantProfile()}; drawScene(p,o); drawPins(p,o); drawLegendCanvas(x, bb);
   deliver(dataURLtoBlob(c.toDataURL('image/png')), filenameBase()+'.png');
 }
 function drawLegendCanvas(x, bb){ const groups = activeGroups().filter(g=>g>0); if (!groups.length) return; let lx = bb.x+12, ly = bb.y+bb.h-18; x.font='700 12px Helvetica,Arial'; x.textBaseline='middle'; for (const g of groups) { x.fillStyle=GROUPS[g].c; x.fillRect(lx,ly-7,14,14); x.strokeStyle=NAVY; x.strokeRect(lx,ly-7,14,14); x.fillStyle=NAVY; x.textAlign='left'; x.fillText(GROUPS[g].n, lx+19, ly); lx += 19 + x.measureText(GROUPS[g].n).width + 16; } }
@@ -1033,14 +1118,15 @@ function exportPDF(){
   const area = {x:M, y:112, w:PW-2*M, h:560}; doc.setDrawColor(...navy); doc.setLineWidth(1); doc.rect(area.x,area.y,area.w,area.h);
   const bb = sceneBBox(); const k = Math.min(area.w/bb.w, area.h/bb.h); const ox = area.x + (area.w - bb.w*k)/2, oy = area.y + (area.h - bb.h*k)/2;
   const fp = bgFootprint(); if (fp) { try { doc.addImage(rotatedBgDataURL(), 'JPEG', ox+(fp.x-bb.x)*k, oy+(fp.y-bb.y)*k, fp.w*k, fp.h*k, undefined, 'FAST'); } catch(e){} }
-  const p = pdfPainter(doc, ox, oy, bb.x, bb.y, k); const o = {field:false, selected:null, invalid:new Set()}; drawScene(p,o); drawPins(p,o);
+  const rs = resolveEnds(); const p = pdfPainter(doc, ox, oy, bb.x, bb.y, k); const o = {field:false, selected:null, invalid:new Set(), ends: rs.ends, dom: dominantProfile()}; drawScene(p,o); drawPins(p,o);
   // legend
   let ly = area.y+area.h+16; doc.setFontSize(8.5); doc.setFont('helvetica','bold'); doc.setTextColor(...navy);
   const groups = activeGroups().filter(g=>g>0); let lx = M;
   if (groups.length) { doc.text('OPTIONS:', lx, ly); lx += 48; for (const g of groups) { const c=GROUPS[g].c; doc.setFillColor(parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16)); doc.setDrawColor(...navy); doc.rect(lx, ly-7, 10, 10, 'FD'); doc.setFont('helvetica','normal'); doc.text(`${g} = ${GROUPS[g].n}`, lx+14, ly); lx += 14 + doc.getTextWidth(`${g} = ${GROUPS[g].n}`) + 14; } ly += 14; lx = M; }
   doc.setFont('helvetica','normal'); doc.setFontSize(8);
   doc.text('END MARKS:  cross tick = end cap   |   filled dot = inside miter   |   open dot = outside miter   |   open square = bay miter   |   dashed tail = continues', M, ly); ly += 11;
-  doc.text('DOWNSPOUT label = elbow sequence + story (e.g. "AABA 2st").  Dashed line beside a run = gutter cover.  Red-orange circles = hazards / attention (not counted).', M, ly); ly += 11;
+  doc.text('DOWNSPOUT label = elbows/offsets top to bottom + story (e.g. "AA 2\" 2\" B 2st").  Dashed line beside a run = gutter cover.', M, ly); ly += 11;
+  doc.text('Grey dashed run = EXISTING gutter, not in scope and not counted.  Red-orange circles = hazards / attention (not counted).', M, ly); ly += 11;
   doc.setFont('helvetica','bold'); doc.text('Schematic — NOT TO SCALE. Lengths are field measurements in feet.', M, ly);
   // ---- page 2: material list
   doc.addPage(); header('MATERIAL LIST'); info(78); let y = 118;
@@ -1048,21 +1134,21 @@ function exportPDF(){
   const line = (label, val, sub) => { if (y > PH-60) { doc.addPage(); header('MATERIAL LIST (cont.)'); y = 80; } doc.setFont('helvetica', sub?'normal':'normal'); doc.setFontSize(sub?9:10); doc.setTextColor(sub?90:0, sub?90:23, sub?90:56); doc.text((sub?'      ':'')+label, M+6, y); doc.setFont('helvetica','bold'); doc.text(String(val), M+262, y, {align:'right'}); doc.setDrawColor(225); doc.line(M, y+4, M+268, y+4); y += sub?12:13.5; };
   const colR = M + 290; // right column for manual fields
   for (const [key, title] of sections) {
-    const m = computeMaterials(key); if (y > PH-120) { doc.addPage(); header('MATERIAL LIST (cont.)'); y = 80; }
+    const m = computeMaterials(key, rs); if (y > PH-120) { doc.addPage(); header('MATERIAL LIST (cont.)'); y = 80; }
     doc.setFillColor(...navy); doc.rect(M, y-10, 268, 16, 'F'); doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.text(title + '   (from drawing)', M+6, y+1); y += 18;
     const profs = Object.keys(m.gutter); if (profs.length) profs.forEach(pr => line(`Gutter ${pr}`, fmtLF(m.gutter[pr]))); else line('Gutter','—');
     line('Gutter covers', fmtLF(m.coverLF)); line('End caps', m.endcaps); line('Miters — inside', m.miterIn); line('Miters — outside', m.miterOut); line('Miters — bay', m.miterBay);
-    line('Downspouts', m.ds); Object.keys(m.dsBySize).forEach(s => line(s, m.dsBySize[s], true)); line('1 story / 2 story', `${m.dsByStory[1]} / ${m.dsByStory[2]}`, true);
-    line('Elbows A', m.elbA); line('Elbows B', m.elbB); line('Outlets', m.outlets);
-    const ovr = job.manual.straps[key]; line('Pipe straps' + (ovr!==undefined?` (override; auto ${m.straps})`:''), ovr!==undefined?ovr:m.straps);
-    line('Splash guards', m.acc.splashguard); line('Splash blocks', m.acc.splashblock); line('Rain chains', m.acc.rainchain+m.rainchainTerm); line('Drip edge extensions', m.acc.dripedge); line('Offsets / jogs (drawn)', m.acc.offset);
+    line('Downspouts', m.ds); Object.keys(m.dsBySize).forEach(s => line(s, m.dsBySize[s], true)); Object.keys(m.dsByStory).sort((a,b)=>a-b).forEach(st => line(`${st} story`, m.dsByStory[st], true));
+    line('Elbows A', m.elbA); line('Elbows B', m.elbB); OFFSET_SIZES.forEach(sz => line(`Offsets ${sz}`, m.offsets[sz])); line('Outlets', m.outlets);
+    const ovr = job.manual.straps[key]; line('Pipe bands' + (ovr!==undefined?` (override; auto ${m.straps})`:''), ovr!==undefined?ovr:m.straps);
+    line('Splash guards', m.acc.splashguard); line('Splash blocks', m.acc.splashblock); line('Rain chains', m.acc.rainchain+m.rainchainTerm); line('Drip edge extensions', m.acc.dripedge);
     y += 10;
   }
   // manual fields column (page 2, right side)
   doc.setPage(2); let my = 118; const mn = job.manual;
   doc.setFillColor(...gold); doc.rect(colR, my-10, PW-M-colR, 16, 'F'); doc.setTextColor(...navy); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.text('MANUAL FIELDS', colR+6, my+1); my += 18;
   const mline = (l,v) => { doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(...navy); doc.text(l, colR+6, my); doc.setFont('helvetica','bold'); doc.text(String(v||'—'), PW-M-4, my, {align:'right'}); doc.setDrawColor(225); doc.line(colR, my+4, PW-M, my+4); my += 15; };
-  mline('Gutter color', mn.gutterColor); mline('Downspout color', mn.dsColor); mline('Hangers', `${mn.hangerType||''} ${mn.hangerQty?'× '+mn.hangerQty:''}`.trim()); mline('Zip screws', mn.zipScrews); mline('Flex pipes', mn.flexPipes); mline('Offsets (qty)', mn.offsets); mline('Spray paint', mn.sprayPaint);
+  mline('Gutter color', mn.gutterColor); mline('Downspout color', mn.dsColor); mline('Hangers', `${mn.hangerType||''} ${mn.hangerQty?'× '+mn.hangerQty:''}`.trim()); mline('Zip screws', mn.zipScrews); mline('Flex pipes', mn.flexPipes); mline('Spray paint', mn.sprayPaint);
   my += 8; doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.text('ADDITIONAL NOTES', colR+6, my); my += 13; doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.text(doc.splitTextToSize(mn.notes||'—', PW-M-colR-10), colR+6, my);
   // text callouts list
   const notes = job.items.filter(i=>i.type==='text'); if (notes.length) { my += 14*Math.min(12, doc.splitTextToSize(mn.notes||'—', PW-M-colR-10).length) + 10; doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.text('CALLOUTS ON DRAWING', colR+6, my); my += 13; doc.setFont('helvetica','normal'); doc.setFontSize(9.5); notes.forEach(n => { if (my < PH-40) { doc.text('• ' + n.text, colR+6, my); my += 12; } }); }
