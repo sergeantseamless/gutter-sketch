@@ -193,6 +193,7 @@ body.full #contBar{bottom:16px}
       <button class="btn" id="tUndo">↶ Undo</button>
       <button class="btn" id="tRedo">↷ Redo</button>
       <button class="btn" id="tSelect" data-tool="select">Select</button>
+      <button class="btn" id="tMulti" title="Select several items at once">Multi</button>
       <button class="btn" id="tPan" data-tool="pan">Pan/Zoom</button>
       <button class="btn ghost" id="tField">◂ Field Mode</button>
       <span class="grow"></span>
@@ -224,6 +225,15 @@ body.full #contBar{bottom:16px}
               <button class="btn" data-tool="acc" data-sub="splashblock">Splash Block</button>
               <button class="btn" data-tool="acc" data-sub="dripedge">Drip Edge Ext.</button>
               <button class="btn" data-tool="acc" data-sub="rainchain">Rain Chain</button>
+            </div>
+          </div>
+          <div class="pgroup"><h4>Story labels (drop on a section)</h4>
+            <div class="pgrid" style="grid-template-columns:repeat(3,1fr)">
+              <button class="btn" data-tool="tag" data-sub="1">1 st</button>
+              <button class="btn" data-tool="tag" data-sub="1.5">1.5 st</button>
+              <button class="btn" data-tool="tag" data-sub="2">2 st</button>
+              <button class="btn" data-tool="tag" data-sub="2.5">2.5 st</button>
+              <button class="btn" data-tool="tag" data-sub="3">3 st</button>
             </div>
           </div>
           <div class="pgroup"><h4>Hazards / Attention</h4>
@@ -314,13 +324,15 @@ const NAVY='#001738', GOLD='#FFCE34', CREAM='#FFF0C3', RED='#F15D22', ERR='#E000
 const GRID = 20;                 // world units per grid square
 const PROFILES = ['6"K','7"K','Half Round','EuroBox','Other'];
 const ENDS = [['auto','Auto'],['endcap','End cap'],['miter_in','Miter inside'],['miter_out','Miter outside'],['miter_bay','Miter bay'],['continues','Continues']];
-const STORIES = [1,1.5,2,2.5,3];
-const STRAPS = {1:2, 1.5:3, 2:3, 2.5:4, 3:4};          // pipe bands per downspout by story
+const STORIES = [[1,'1 story'],[1.5,'1.5 story'],[2,'2 story'],[2.5,'2.5 story'],[3,'3 story'],['LR','Lower roof']];
+const STRAPS = {1:2, 1.5:3, 2:3, 2.5:4, 3:4, LR:2};   // pipe bands per downspout by story (lower-roof drop assumed short)
+const storyLabel = s => s==='LR' ? 'LR' : `${s}st`;
+const storyName = s => s==='LR' ? 'Lower roof' : `${s} story`;
 const SEQ_TOKENS = ['A','B','2"','4"','6"'];             // elbow / offset tokens, tapped in order
 const OFFSET_SIZES = ['2"','4"','6"'];
 const CALLOUT_PRESETS = ['Tie-in', 'Tie-in to existing', 'Remove existing', 'Reuse existing DS'];
 const DS_SIZES = ['3x4','4" round','4x5','square'];
-const TERMS = [['splashblock','Splash block'],['drain','Drain'],['lowerroof','Lower roof'],['driveway','Driveway'],['rainchain','Rain chain'],['other','Other']];
+const TERMS = [['splashblock','Splash block'],['drain','Drain'],['driveway','Driveway'],['rainchain','Rain chain'],['other','Other']];
 const ACC = {splashguard:{n:'Splash guard',ab:'SG'}, splashblock:{n:'Splash block',ab:'SB'}, offset:{n:'Offset / jog',ab:'OFF'}, dripedge:{n:'Drip edge ext.',ab:'DE'}, rainchain:{n:'Rain chain',ab:'RC'}};
 const HAZ = {ac:{n:'AC unit',ab:'AC'}, pool:{n:'Pool',ab:'POOL'}, dish:{n:'Satellite dish',ab:'SAT'}, septic:{n:'Septic / well',ab:'SEP'}, power:{n:'Power line',ab:'PWR'}, landscape:{n:'Landscaping',ab:'LS'}, warn:{n:'Warning',ab:'!'}};
 
@@ -393,8 +405,9 @@ function openJob(id){
     if (job.defaults.lend==='endcap') job.defaults.lend='auto'; if (job.defaults.rend==='endcap') job.defaults.rend='auto';
     job.v = 2;
   }
+  for (const it of job.items) if (it.type==='ds' && it.term==='lowerroof') { it.story = 'LR'; it.term = 'other'; }
   for (const it of job.items) if (it.type==='ds' && !Array.isArray(it.seq)) it.seq = typeof it.seq==='string' ? it.seq.split('').filter(c=>c==='A'||c==='B') : [];
-  undoStack.length = 0; redoStack.length = 0; sel = null; pendingStart = null; lastEnd = null; lastTouch = null;
+  undoStack.length = 0; redoStack.length = 0; sel = null; multi.clear(); pendingStart = null; lastEnd = null; lastTouch = null;
   const runs = job.items.filter(i => i.type === 'run'); if (runs.length) { const r = runs[runs.length-1]; lastEnd = {x:r.x2, y:r.y2}; }
   setMode(job.mode || 'field', true);
   saveStore();
@@ -423,6 +436,7 @@ function undo(){ if (!undoStack.length) return toast('Nothing to undo'); redoSta
 function redo(){ if (!redoStack.length) return toast('Nothing to redo'); undoStack.push(JSON.stringify(job.items)); job.items = JSON.parse(redoStack.pop()); afterItemsChanged(); }
 function afterItemsChanged(){
   if (sel && !job.items.find(i => i.id === sel)) { sel = null; hideProps(); }
+  for (const id of [...multi]) if (!job.items.find(i => i.id === id)) multi.delete(id);
   const runs = job.items.filter(i => i.type === 'run'); lastEnd = runs.length ? {x:runs[runs.length-1].x2, y:runs[runs.length-1].y2} : null;
   if (pendingStart && lastEnd && pendingStart.fromLast) pendingStart = {...lastEnd, fromLast:true};
   if (pendingStart && !lastEnd && pendingStart.fromLast) pendingStart = null;
@@ -528,14 +542,14 @@ function drawRun(p, r, o){
   const mx=(r.x1+r.x2)/2, my=(r.y1+r.y2)/2, sgn = (py < 0 || (py===0 && px<0)) ? 1 : -1;
   if (r.existing) { // existing gutter, not in scope: dashed grey, no end marks, optional length
     const col = field ? '#444' : '#7a7a7a';
-    if (o.selected===r.id) p.line(r.x1,r.y1,r.x2,r.y2,{color:GOLD, width:14});
+    if (o.isSel(r.id)) p.line(r.x1,r.y1,r.x2,r.y2,{color:GOLD, width:14});
     p.line(r.x1,r.y1,r.x2,r.y2,{color:col, width: field?4:3, dash:[10,8]});
     p.text(runLabel(r), mx + px*12*sgn, my + py*12*sgn, {size: field?13:11, bold:false, color:col, bg:'#fff', angle:ang});
-    if (o.selected===r.id) { p.circle(r.x1,r.y1,7,{fill:'#fff',color:NAVY,width:2}); p.circle(r.x2,r.y2,7,{fill:'#fff',color:NAVY,width:2}); }
+    if (o.isSel(r.id)) { p.circle(r.x1,r.y1,7,{fill:'#fff',color:NAVY,width:2}); p.circle(r.x2,r.y2,7,{fill:'#fff',color:NAVY,width:2}); }
     return;
   }
   const col = o.invalid?.has(r.id) ? ERR : groupColor(r.g, field), w = field ? 6 : 4;
-  if (o.selected===r.id) p.line(r.x1,r.y1,r.x2,r.y2,{color:GOLD, width:w+10});
+  if (o.isSel(r.id)) p.line(r.x1,r.y1,r.x2,r.y2,{color:GOLD, width:w+10});
   if (!field && r.g===1) p.line(r.x1,r.y1,r.x2,r.y2,{color:NAVY, width:w+2});
   p.line(r.x1,r.y1,r.x2,r.y2,{color:col, width:w});
   if (r.cover) p.line(r.x1+px*7, r.y1+py*7, r.x2+px*7, r.y2+py*7, {color:col, width:2, dash:[6,4]});
@@ -545,22 +559,22 @@ function drawRun(p, r, o){
   const off = r.cover ? 20 : 13;
   p.text(runLabel(r, o.dom), mx + px*off*sgn, my + py*off*sgn, {size: field?15:12, bold:true, color: col, bg:'#fff', angle: ang});
   if (r.g) badge(p, mx - px*12*sgn, my - py*12*sgn, r.g, 6.5);
-  if (o.selected===r.id) { p.circle(r.x1,r.y1,7,{fill:'#fff',color:NAVY,width:2}); p.circle(r.x2,r.y2,7,{fill:'#fff',color:NAVY,width:2}); }
+  if (o.isSel(r.id)) { p.circle(r.x1,r.y1,7,{fill:'#fff',color:NAVY,width:2}); p.circle(r.x2,r.y2,7,{fill:'#fff',color:NAVY,width:2}); }
 }
 function drawDS(p, d, o){
   const field=o.field, col = o.invalid?.has(d.id) ? ERR : groupColor(d.g, field), s=16;
-  if (o.selected===d.id) p.circle(d.x,d.y,s*1.1,{fill:GOLD});
+  if (o.isSel(d.id)) p.circle(d.x,d.y,s*1.1,{fill:GOLD});
   p.rect(d.x-s/2, d.y-s/2, s, s, {fill:col, color: d.g===1?NAVY:undefined, width:1.5});
-  p.text(`${seqText(d.seq)||'?'} ${d.story||'?'}st`, d.x, d.y+s/2+10, {size: field?14:11, bold:true, color:col, bg:'#fff'});
+  p.text(`${seqText(d.seq)||'?'} ${d.story?storyLabel(d.story):'?'}`, d.x, d.y+s/2+10, {size: field?14:11, bold:true, color:col, bg:'#fff'});
   if (!field && d.size && d.size!=='3x4') p.text(d.size, d.x, d.y+s/2+23, {size:9, color:col, bg:'#fff'});
   if (d.g) badge(p, d.x+s/2+4, d.y-s/2-4, d.g, 7);
 }
 function drawAcc(p, a, o){
   const col = o.invalid?.has(a.id) ? ERR : groupColor(a.g, o.field); const r = a.rot||0, c=Math.cos(r*Math.PI/2), s=Math.sin(r*Math.PI/2);
   const T = (x,y) => [a.x + x*c - y*s, a.y + x*s + y*c];
-  if (o.selected===a.id) p.circle(a.x,a.y,18,{fill:GOLD});
+  if (o.isSel(a.id)) p.circle(a.x,a.y,18,{fill:GOLD});
   switch(a.sub){
-    case 'splashguard': p.poly([T(-10,8),T(10,8),T(10,-10)],{fill:col,close:true}); break;
+    case 'splashguard': { const pts=[]; for (let i=0;i<10;i++){ const R = i%2 ? 5 : 12, ang = -Math.PI/2 + i*Math.PI/5; pts.push(T(R*Math.cos(ang), R*Math.sin(ang))); } p.poly(pts,{fill:col,close:true}); break; }
     case 'splashblock': p.poly([T(-11,-5),T(11,-5),T(11,5),T(-11,5)],{color:col,width:2.5,close:true,fill:'#fff'}); p.line(...T(-11,0),...T(11,0),{color:col,width:1.5}); break;
     case 'offset': p.poly([T(-12,-8),T(-3,-8),T(3,8),T(12,8)],{color:col,width:3}); break;
     case 'dripedge': p.poly([T(-12,-3),T(12,-3),T(12,3),T(-12,3)],{fill:col,close:true}); break;
@@ -571,26 +585,31 @@ function drawAcc(p, a, o){
 }
 function drawHaz(p, h, o){
   const col = o.field ? '#000' : RED;
-  if (o.selected===h.id) p.circle(h.x,h.y,19,{fill:GOLD});
+  if (o.isSel(h.id)) p.circle(h.x,h.y,19,{fill:GOLD});
   if (h.sub==='warn') { p.poly([[h.x,h.y-13],[h.x+13,h.y+10],[h.x-13,h.y+10]],{fill:'#fff',color:col,width:3,close:true}); p.text('!', h.x, h.y+2, {size:14, bold:true, color:col}); }
   else { p.circle(h.x,h.y,13,{fill:'#fff',color:col,width:3}); p.text(HAZ[h.sub].ab, h.x, h.y, {size: HAZ[h.sub].ab.length>2?7:10, bold:true, color:col}); }
 }
+function drawTag(p, t, o){ // story designator for a section of the house — informational, not counted
+  const col = o.field ? '#000' : NAVY;
+  if (o.isSel(t.id)) p.circle(t.x,t.y,22,{fill:GOLD});
+  p.text(`${t.story} STORY`, t.x, t.y, {size:12, bold:true, color:'#fff', bg:col});
+}
 function drawInk(p, k, o){
-  if (o.selected===k.id) p.poly(k.pts,{color:GOLD,width:(k.w||3)+8});
+  if (o.isSel(k.id)) p.poly(k.pts,{color:GOLD,width:(k.w||3)+8});
   p.poly(k.pts,{color: o.field?'#000':(k.color||'#000'), width:k.w||3});
 }
 function drawText(p, t, o){
   const col = o.field?'#000':groupColor(t.g,false);
-  if (o.selected===t.id) p.circle(t.x,t.y,10,{fill:GOLD});
+  if (o.isSel(t.id)) p.circle(t.x,t.y,10,{fill:GOLD});
   p.line(t.lx,t.ly,t.x,t.y,{color:col,width:1.5});
   p.circle(t.lx,t.ly,3,{fill:col});
   p.text(t.text||'…', t.x, t.y, {size:12, bold:true, color:col, bg:'#fff', bgStroke:col});
-  if (o.selected===t.id) p.circle(t.lx,t.ly,7,{fill:'#fff',color:NAVY,width:2});
+  if (o.isSel(t.id)) p.circle(t.lx,t.ly,7,{fill:'#fff',color:NAVY,width:2});
 }
 function drawScene(p, o){
-  const order = ['ink','xrun','run','ds','acc','haz','text'];
+  const order = ['ink','xrun','run','ds','acc','haz','tag','text'];
   for (const ty of order) for (const it of job.items) if ((ty==='xrun' && it.type==='run' && it.existing) || (it.type===ty && !(ty==='run' && it.existing))) {
-    const k = it.type; if (k==='run') drawRun(p,it,o); else if (k==='ds') drawDS(p,it,o); else if (k==='acc') drawAcc(p,it,o); else if (k==='haz') drawHaz(p,it,o); else if (k==='ink') drawInk(p,it,o); else drawText(p,it,o);
+    const k = it.type; if (k==='run') drawRun(p,it,o); else if (k==='ds') drawDS(p,it,o); else if (k==='acc') drawAcc(p,it,o); else if (k==='haz') drawHaz(p,it,o); else if (k==='tag') drawTag(p,it,o); else if (k==='ink') drawInk(p,it,o); else drawText(p,it,o);
   }
 }
 function drawPins(p, o){
@@ -611,7 +630,7 @@ function render(){
   if (job.bg.type==='image') { const rec = imgCache.get(job.bg.imgId); if (rec) canvasPainter(ctx).image(rec.img, job.bg.x||0, job.bg.y||0, job.bg.w, job.bg.h, job.bg.rot||0); else drawGrid(ctx); } else drawGrid(ctx);
   const p = canvasPainter(ctx);
   const rs = resolveEnds();
-  const o = {field:isField(), selected:sel, invalid: invalidSet(), highlightPin, ends: rs.ends, dom: dominantProfile()};
+  const o = {field:isField(), isSel: id => id===sel || multi.has(id), invalid: invalidSet(), highlightPin, ends: rs.ends, dom: dominantProfile()};
   drawScene(p, o);
   if (!o.field && tool==='select') for (const c of rs.corners) if (c.kind!=='seam') p.circle(c.x, c.y, 11, {color: c.auto ? 'rgba(0,23,56,0.25)' : GOLD, width:2});
   drawPins(p, o);
@@ -626,6 +645,8 @@ function render(){
 let tool = null;           // 'run'|'ds'|'acc'|'haz'|'ink'|'text'|'select'|'pan'|null
 let toolSub = null;        // accessory/hazard subtype
 let sel = null;            // selected item id
+const multi = new Set();   // multi-select ids (Select tool with Multi on)
+let multiMode = false;
 let pendingStart = null;   // {x,y,fromLast}
 let lastEnd = null;        // end of last run drawn
 let lastTouch = null;      // last canvas point touched (photo pin location)
@@ -636,7 +657,7 @@ const isExistingTool = () => tool==='run' && (toolSub==='existing' || (isField()
 
 function setTool(t, sub){
   tool = t; toolSub = sub || null; pendingStart = null; runPreview = null;
-  if (t !== 'select') { sel = null; hideProps(); }
+  if (t !== 'select') { sel = null; multi.clear(); hideProps(); }
   if (t === 'run' && lastEnd) pendingStart = {...lastEnd, fromLast:true};
   $$('[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool===t && (!b.dataset.sub || b.dataset.sub===sub)));
   $('#fRun').classList.toggle('active', t==='run'); $('#fDs').classList.toggle('active', t==='ds'); const fe=$('#fExist'); if (fe) fe.classList.toggle('active', fieldExisting);
@@ -649,6 +670,7 @@ function updateHints(){
   else if (tool==='ds') hint = 'TAP WHERE THE DOWNSPOUT GOES';
   else if (tool==='acc') hint = 'Tap to place ' + ACC[toolSub].n;
   else if (tool==='haz') hint = 'Tap to place ' + HAZ[toolSub].n;
+  else if (tool==='tag') hint = `Tap the section that is ${toolSub} story`;
   else if (tool==='text') hint = 'Tap where the note points';
   else if (tool==='ink') hint = 'Draw with the Pencil';
   else if (tool==='select') hint = 'Tap an item to edit it · tap a corner to flip its miter';
@@ -717,7 +739,7 @@ function beginGesture(w, e){
     const pin = hitPin(w.x,w.y); if (pin) return {kind:'pin', pin, ox:pin.x, oy:pin.y, start:w, snap:false};
     const corner = resolveEnds().corners.find(c => c.kind!=='seam' && dist(w.x,w.y,c.x,c.y) < 14/job.view.s); if (corner) return {kind:'corner', corner};
     const hit = hitTest(w.x,w.y);
-    if (hit) return {kind:'move', it:hit, start:w, orig:JSON.stringify(hit), snapped:false};
+    if (hit) { const group = multi.has(hit.id) ? job.items.filter(i => multi.has(i.id)) : [hit]; return {kind:'move', it:hit, items: group, origs: group.map(i => JSON.stringify(i)), start:w, snapped:false}; }
     return {kind:'pan', v0:{...job.view}};
   }
   if (tool==='ink' && pen) { inkPreview = [[w.x,w.y]]; return {kind:'ink'}; }
@@ -735,7 +757,7 @@ cv.addEventListener('pointermove', e => {
   if (gesture.kind==='pan') { if (!p.moved) return; job.view.tx = gesture.v0.tx + dxs; job.view.ty = gesture.v0.ty + dys; render(); return; }
   if (gesture.kind==='ink') { inkPreview.push([w.x,w.y]); render(); return; }
   if (gesture.kind==='rundrag') { if (!p.moved) return; const s2 = snapPt(w.x,w.y); runPreview = {x1:gesture.start.x,y1:gesture.start.y,x2:s2.x,y2:s2.y}; render(); return; }
-  if (gesture.kind==='move') { if (!p.moved) return; if (!gesture.snapped) { snapshot(); gesture.snapped = true; } const o = JSON.parse(gesture.orig); const dx = w.x-gesture.start.x, dy = w.y-gesture.start.y; moveItem(gesture.it, o, dx, dy); render(); return; }
+  if (gesture.kind==='move') { if (!p.moved) return; if (!gesture.snapped) { snapshot(); gesture.snapped = true; } const dx = w.x-gesture.start.x, dy = w.y-gesture.start.y; gesture.items.forEach((it,i) => moveItem(it, JSON.parse(gesture.origs[i]), dx, dy)); render(); return; }
   if (gesture.kind==='endpoint') { if (!p.moved) return; if (!gesture.snapped) { snapshot(); gesture.snapped = true; } const s2 = snapPt(w.x,w.y,gesture.it.id); if (gesture.end===1) { gesture.it.x1=s2.x; gesture.it.y1=s2.y; } else { gesture.it.x2=s2.x; gesture.it.y2=s2.y; } render(); return; }
   if (gesture.kind==='anchor') { if (!p.moved) return; if (!gesture.snapped) { snapshot(); gesture.snapped = true; } gesture.it.lx=w.x; gesture.it.ly=w.y; render(); return; }
   if (gesture.kind==='pin') { if (!p.moved) return; gesture.pin.x = gesture.ox + (w.x-gesture.start.x); gesture.pin.y = gesture.oy + (w.y-gesture.start.y); render(); return; }
@@ -754,7 +776,7 @@ function endPointer(e){
   if (!g) return;
   if (g.kind==='ink') { const pts = inkPreview; inkPreview = null; if (pts && pts.length>1) { snapshot(); job.items.push({type:'ink', id:uid(), g:curGroup, color:inkColor, w:inkW, pts: simplify(pts)}); afterItemsChanged(); } else render(); return; }
   if (g.kind==='rundrag') { runPreview = null; if (p.moved) { const s2 = snapPt(w.x,w.y); if (dist(g.start.x,g.start.y,s2.x,s2.y) > 4) { openLengthPad(g.start, s2); return; } } else { tapRun(w); } render(); return; }
-  if (g.kind==='move' || g.kind==='endpoint' || g.kind==='anchor') { if (p.moved) { afterItemsChanged(); showProps(); } else if (g.kind==='move') { if (tap) { sel = g.it.id; showProps(); render(); } } return; }
+  if (g.kind==='move' || g.kind==='endpoint' || g.kind==='anchor') { if (p.moved) { afterItemsChanged(); showProps(); } else if (g.kind==='move') { if (tap) selectItem(g.it); } return; }
   if (g.kind==='pin') { if (p.moved) { touch(); render(); } else if (tap) openPhotoViewer(g.pin.id); return; }
   if (g.kind==='corner') { if (tap) cycleCorner(g.corner); return; }
   if (g.kind==='pan' && tap) handleTap(w, e);
@@ -770,10 +792,11 @@ function handleTap(w, e){
   if (tool==='ds') return openDsSheet(w, null);
   if (tool==='acc') { snapshot(); job.items.push({type:'acc', sub:toolSub, id:uid(), g:curGroup, x:w.x, y:w.y, rot:0}); afterItemsChanged(); return; }
   if (tool==='haz') { snapshot(); job.items.push({type:'haz', sub:toolSub, id:uid(), x:w.x, y:w.y}); afterItemsChanged(); return; }
+  if (tool==='tag') { snapshot(); job.items.push({type:'tag', story:toolSub, id:uid(), x:w.x, y:w.y}); afterItemsChanged(); return; }
   if (tool==='text') return openTextSheet(w, null);
   if (tool==='select') { const pin = hitPin(w.x,w.y); if (pin) return openPhotoViewer(pin.id);
     const corner = resolveEnds().corners.find(c => c.kind!=='seam' && dist(w.x,w.y,c.x,c.y) < 14/job.view.s); if (corner) return cycleCorner(corner);
-    const hit = hitTest(w.x,w.y); sel = hit ? hit.id : null; if (sel) showProps(); else hideProps(); render(); return; }
+    const hit = hitTest(w.x,w.y); if (hit) selectItem(hit); else { sel = null; if (!multiMode) multi.clear(); showProps(); render(); } return; }
   if (!tool) { const pin = hitPin(w.x,w.y); if (pin && !isField()) openPhotoViewer(pin.id); }
 }
 function cycleCorner(c){ // auto -> inside -> outside -> bay -> auto
@@ -784,6 +807,12 @@ function cycleCorner(c){ // auto -> inside -> outside -> bay -> auto
   toast('Corner: ' + (next ? endLabel(next) : 'auto (' + endLabel(resolveEnds().corners.find(x=>x.key===c.key)?.kind || 'endcap') + ')'));
   renderMaterials(); touch(); render();
 }
+function selectItem(it){
+  if (multiMode) { sel = null; if (multi.has(it.id)) multi.delete(it.id); else multi.add(it.id); }
+  else { multi.clear(); sel = it.id; }
+  showProps(); render();
+}
+function setMultiMode(on){ multiMode = on; $('#tMulti').classList.toggle('active', on); if (!on) multi.clear(); else if (sel) { multi.add(sel); sel = null; } if (tool!=='select') setTool('select'); showProps(); render(); }
 function tapRun(w){
   if (!pendingStart) { pendingStart = snapPt(w.x,w.y); updateHints(); render(); return; }
   const end = snapPt(w.x,w.y);
@@ -834,7 +863,7 @@ function openDsSheet(w, existing){
   let seq = Array.isArray(cur.seq) ? [...cur.seq] : [];
   const ov = openSheet(`<h3>${existing?'Edit downspout':'Downspout'}</h3>
     ${field?'':`<div class="row"><label class="l">Size</label>${segHTML('size', DS_SIZES, cur.size)}</div>`}
-    <div class="row"><label class="l">Story</label>${segHTML('story', STORIES.map(s=>[s, s+' story']), cur.story, true)}</div>
+    <div class="row"><label class="l">Story</label>${segHTML('story', STORIES, cur.story, true)}</div>
     <div class="row"><label class="l">Elbows &amp; offsets (tap in order, top to bottom)</label>
       <div class="seg big" id="seqKeys">${SEQ_TOKENS.map(t=>`<button class="btn" data-e="${esc(t)}">${esc(t)}</button>`).join('')}<button class="btn" data-e="bs">⌫</button></div>
       <div class="seqbox" id="seqBox">${esc(seqText(seq))}</div></div>
@@ -846,7 +875,7 @@ function openDsSheet(w, existing){
   ov.querySelector('#seqKeys').addEventListener('click', e => { const b=e.target.closest('[data-e]'); if(!b) return; if (b.dataset.e==='bs') seq.pop(); else if (seq.length<12) seq.push(b.dataset.e); box.textContent = seqText(seq); });
   ov.querySelector('#dsCancel').onclick = () => { closeSheet(); render(); };
   ov.querySelector('#dsDone').onclick = () => {
-    const story = +segVal(ov,'story'); const size = field ? cur.size : segVal(ov,'size'); const term = field ? cur.term : segVal(ov,'term'); const note = field ? (cur.note||'') : ov.querySelector('#dsNote').value.trim(); const g = field ? (cur.g??0) : +segVal(ov,'g');
+    const sv = segVal(ov,'story'); const story = sv==='LR' ? 'LR' : +sv; const size = field ? cur.size : segVal(ov,'size'); const term = field ? cur.term : segVal(ov,'term'); const note = field ? (cur.note||'') : ov.querySelector('#dsNote').value.trim(); const g = field ? (cur.g??0) : +segVal(ov,'g');
     if (!seq.length) { toast('Enter the elbow sequence (A / B / offsets)'); return; }
     closeSheet(); snapshot();
     if (existing) Object.assign(existing, {story,size,term,note,seq,g}); else job.items.push({type:'ds', id:uid(), g, x:w.x, y:w.y, size, story, seq, term, note});
@@ -868,9 +897,24 @@ function confirmSheet(msg, okLabel, cb){ const ov = openSheet(`<h3>${esc(msg)}</
 
 /* ---------------- props panel (select tool) ---------------- */
 function hideProps(){ $('#props').classList.add('hidden'); }
+function showMultiProps(){
+  const el = $('#props'); const items = job.items.filter(i => multi.has(i.id)); if (!items.length) { el.innerHTML = `<h3>Multi-select</h3><div class="row">Tap items to add them to the selection. Tap again to remove.</div><div class="actions"><button class="btn ghost" id="pMultiOff">Done</button></div>`; el.classList.remove('hidden'); el.querySelector('#pMultiOff').onclick = () => setMultiMode(false); return; }
+  const groupable = items.filter(i => i.type!=='haz' && i.type!=='tag' && !(i.type==='run' && i.existing));
+  const gs = new Set(groupable.map(i => i.g||0)); const gcur = gs.size===1 ? [...gs][0] : null;
+  el.innerHTML = `<h3>${items.length} selected</h3>
+    ${groupable.length ? `<div class="row"><label class="l">Move all to group</label>${segHTML('g', GROUPS.map((g,i)=>[i,g.short]), gcur)}</div>` : ''}
+    <div class="row" style="font-size:12px">${items.filter(i=>i.type==='run').length} runs · ${items.filter(i=>i.type==='ds').length} downspouts · ${items.length - items.filter(i=>i.type==='run'||i.type==='ds').length} other</div>
+    <div class="actions" style="justify-content:space-between"><button class="btn red" id="pMultiDel">Delete all</button><span><button class="btn" id="pMultiClear">Clear</button> <button class="btn ghost" id="pMultiOff">Done</button></span></div>`;
+  el.classList.remove('hidden');
+  wireSeg(el,'g', v => { snapshot(); groupable.forEach(i => i.g = +v); afterItemsChanged(); showProps(); });
+  el.querySelector('#pMultiDel').onclick = () => { snapshot(); job.items = job.items.filter(i => !multi.has(i.id)); multi.clear(); afterItemsChanged(); showProps(); };
+  el.querySelector('#pMultiClear').onclick = () => { multi.clear(); showProps(); render(); };
+  el.querySelector('#pMultiOff').onclick = () => setMultiMode(false);
+}
 function showProps(){
+  if (multiMode && !isField()) return showMultiProps();
   const it = job.items.find(i => i.id===sel); const el = $('#props'); if (!it || isField()) return hideProps();
-  const grp = (it.type==='haz' || (it.type==='run' && it.existing)) ? '' : `<div class="row"><label class="l">Group</label>${segHTML('g', GROUPS.map((g,i)=>[i,g.short]), it.g??0)}</div>`;
+  const grp = (it.type==='haz' || it.type==='tag' || (it.type==='run' && it.existing)) ? '' : `<div class="row"><label class="l">Group</label>${segHTML('g', GROUPS.map((g,i)=>[i,g.short]), it.g??0)}</div>`;
   let body = '';
   const rsv = it.type==='run' && !it.existing ? (resolveEnds().ends.get(it.id) || {l:'endcap', r:'endcap'}) : null;
   if (it.type==='run' && it.existing) body = `<div class="row"><b>Existing gutter — not in scope, not counted</b></div><div class="row"><label class="l">Length (ft, optional)</label><input type="number" inputmode="decimal" id="pLen" value="${it.len||''}" step="0.5"><button class="btn sm" id="pPad">Pad</button></div>`;
@@ -880,10 +924,10 @@ function showProps(){
     <div class="row"><label class="l">Story</label>${segHTML('story', [[1,'1'],[2,'2']], it.story)}</div>
     <div class="row"><label class="l">Start end — now: ${esc(endLabel(rsv.l))}</label>${segHTML('lend', ENDS, it.lend||'auto')}</div>
     <div class="row"><label class="l">Finish end — now: ${esc(endLabel(rsv.r))}</label>${segHTML('rend', ENDS, it.rend||'auto')}</div>`;
-  else if (it.type==='ds') body = `<div class="row"><b>${esc(it.size)} · ${esc(seqText(it.seq)||'?')} · ${it.story}st · ${esc(termLabel(it.term))}</b></div><div class="row">${it.note?esc(it.note):''}</div><div class="row"><button class="btn" id="pEditDs">Edit fields</button></div>`;
+  else if (it.type==='ds') body = `<div class="row"><b>${esc(it.size)} · ${esc(seqText(it.seq)||'?')} · ${esc(storyName(it.story))} · ${esc(termLabel(it.term))}</b></div><div class="row">${it.note?esc(it.note):''}</div><div class="row"><button class="btn" id="pEditDs">Edit fields</button></div>`;
   else if (it.type==='text') body = `<div class="row"><b>${esc(it.text)}</b></div><div class="row"><button class="btn" id="pEditTx">Edit text</button></div>`;
   else if (it.type==='ink') body = `<div class="row"><label class="l">Color</label>${segHTML('color', [['#000000','Black'],['#001738','Navy'],['#F15D22','Red-orange']], it.color)}</div><div class="row"><label class="l">Width</label>${segHTML('w', [[3,'Thin'],[7,'Thick']], it.w)}</div>`;
-  const title = it.type==='run'?(it.existing?'Existing gutter':'Gutter run'): it.type==='ds'?'Downspout': it.type==='acc'?ACC[it.sub].n: it.type==='haz'?HAZ[it.sub].n: it.type==='ink'?'Ink stroke':'Text callout';
+  const title = it.type==='tag' ? `${it.story}-story label` : it.type==='run'?(it.existing?'Existing gutter':'Gutter run'): it.type==='ds'?'Downspout': it.type==='acc'?ACC[it.sub].n: it.type==='haz'?HAZ[it.sub].n: it.type==='ink'?'Ink stroke':'Text callout';
   el.innerHTML = `<h3>${esc(title)}</h3>${grp}${body}<div class="actions" style="justify-content:space-between">${['acc','ds'].includes(it.type)?'<button class="btn" id="pRot">Rotate</button>':'<span></span>'}<span><button class="btn red" id="pDel">Delete</button> <button class="btn ghost" id="pClose">Close</button></span></div>`;
   el.classList.remove('hidden');
   const upd = (fn) => { snapshot(); fn(); afterItemsChanged(); };
@@ -927,10 +971,11 @@ $$('[data-tool]').forEach(b => b.addEventListener('click', () => { fieldExisting
 $$('[data-ink]').forEach(b => b.addEventListener('click', () => { inkColor = b.dataset.ink; $$('[data-ink]').forEach(x=>x.classList.toggle('active', x===b)); setTool('ink'); }));
 $$('[data-inkw]').forEach(b => b.addEventListener('click', () => { inkW = +b.dataset.inkw; $$('[data-inkw]').forEach(x=>x.classList.toggle('active', x===b)); setTool('ink'); }));
 $('[data-ink="#000000"]').classList.add('active'); $('[data-inkw="3"]').classList.add('active');
+$('#tMulti').onclick = () => setMultiMode(!multiMode);
 $('#pToggle').onclick = () => { const p=$('#palette'); p.classList.toggle('collapsed'); $('#pToggle').textContent = p.classList.contains('collapsed')?'▸':'◂'; };
 $('#mToggle').onclick = () => { const p=$('#matPanel'); p.classList.toggle('collapsed'); $('#mToggle').textContent = p.classList.contains('collapsed')?'▴':'▾'; };
 // group swatches
-const gsw = $('#groupSw'); GROUPS.forEach((g,i) => { const b = document.createElement('button'); b.className='sw'+(i===0?' active':''); b.style.background=g.c; b.title=g.n; b.textContent = i?i:''; b.style.color = i===1?NAVY:'#fff'; b.style.fontWeight='900'; b.onclick = () => { curGroup=i; $$('#groupSw .sw').forEach((x,k)=>x.classList.toggle('active',k===i)); $('#groupInfo').textContent = `New items go to ${g.n}`; if (sel) { const it=job.items.find(x=>x.id===sel); if (it && it.type!=='haz') { snapshot(); it.g=i; afterItemsChanged(); showProps(); } } }; gsw.appendChild(b); });
+const gsw = $('#groupSw'); GROUPS.forEach((g,i) => { const b = document.createElement('button'); b.className='sw'+(i===0?' active':''); b.style.background=g.c; b.title=g.n; b.textContent = i?i:''; b.style.color = i===1?NAVY:'#fff'; b.style.fontWeight='900'; b.onclick = () => { curGroup=i; $$('#groupSw .sw').forEach((x,k)=>x.classList.toggle('active',k===i)); $('#groupInfo').textContent = `New items go to ${g.n}`; const targets = job.items.filter(x => (x.id===sel || multi.has(x.id)) && x.type!=='haz' && x.type!=='tag' && !(x.type==='run' && x.existing)); if (targets.length) { snapshot(); targets.forEach(x => x.g=i); afterItemsChanged(); showProps(); } }; gsw.appendChild(b); });
 $('#groupInfo').textContent = 'New items go to Base';
 // header fields
 const hdr = {jCustomer:'customer', jAddress:'address', jDate:'date', jQuote:'quote', jPrep:'prep'};
@@ -1028,6 +1073,7 @@ function computeMaterials(gFilter, rs){ // gFilter: 'all' or group index; rs = r
   for (const c of rs.corners) { if (gFilter!=='all' && !c.groups.includes(+gFilter)) continue; if (c.kind==='miter_in') m.miterIn++; else if (c.kind==='miter_out') m.miterOut++; else if (c.kind==='miter_bay') m.miterBay++; }
   m.outlets = m.ds; return m;
 }
+const storyKeys = o => Object.keys(o).sort((a,b) => (a==='LR') - (b==='LR') || a - b);
 const fmtLF = n => (Math.round(n*10)/10) + "'";
 function renderMaterials(){
   if (!job || isField()) return;
@@ -1048,7 +1094,7 @@ function renderMaterials(){
   html += row('Miters — inside', m.miterIn, mm => mm.miterIn||'') + row('Miters — outside', m.miterOut, mm => mm.miterOut||'') + row('Miters — bay', m.miterBay, mm => mm.miterBay||'');
   html += row('Downspouts', m.ds, mm => mm.ds||'');
   for (const s of Object.keys(m.dsBySize)) html += `<tr class="sub"><td>&nbsp;&nbsp;${esc(s)}</td><td>${m.dsBySize[s]}</td></tr>`;
-  for (const st of Object.keys(m.dsByStory).sort((a,b)=>a-b)) html += `<tr class="sub"><td>&nbsp;&nbsp;${st} story</td><td>${m.dsByStory[st]}</td></tr>`;
+  for (const st of storyKeys(m.dsByStory)) html += `<tr class="sub"><td>&nbsp;&nbsp;${esc(storyName(st==='LR'?'LR':+st))}</td><td>${m.dsByStory[st]}</td></tr>`;
   html += row('Elbows A', m.elbA, mm => mm.elbA||'') + row('Elbows B', m.elbB, mm => mm.elbB||'');
   for (const sz of OFFSET_SIZES) html += row(`Offsets ${sz}`, m.offsets[sz], mm => mm.offsets[sz]||'');
   html += row('Outlets', m.outlets, mm => mm.outlets||'');
@@ -1073,7 +1119,7 @@ function renderMaterials(){
 /* ---------------- export ---------------- */
 function sceneBBox(){
   let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity; const add=(x,y)=>{ if(x<x0)x0=x; if(y<y0)y0=y; if(x>x1)x1=x; if(y>y1)y1=y; };
-  for (const it of job.items) { if (it.type==='run') { add(it.x1,it.y1); add(it.x2,it.y2); } else if (it.type==='ink') it.pts.forEach(q=>add(q[0],q[1])); else if (it.type==='text') { add(it.x-60,it.y-15); add(it.x+60,it.y+15); add(it.lx,it.ly); } else { add(it.x-25,it.y-25); add(it.x+25,it.y+35); } }
+  for (const it of job.items) { if (it.type==='run') { add(it.x1,it.y1); add(it.x2,it.y2); } else if (it.type==='ink') it.pts.forEach(q=>add(q[0],q[1])); else if (it.type==='text' || it.type==='tag') { add(it.x-60,it.y-15); add(it.x+60,it.y+15); if (it.lx!==undefined) add(it.lx,it.ly); } else { add(it.x-25,it.y-25); add(it.x+25,it.y+35); } }
   for (const p of job.photos) add(p.x,p.y);
   const fp = bgFootprint(); if (fp) { add(fp.x,fp.y); add(fp.x+fp.w,fp.y+fp.h); }
   if (x0===Infinity) { x0=0;y0=0;x1=400;y1=300; }
@@ -1101,7 +1147,7 @@ function exportPNG(){
   const bb = sceneBBox(); const k = Math.min(3, 3000/bb.w, 3000/bb.h); const c = document.createElement('canvas'); c.width = Math.round(bb.w*k); c.height = Math.round(bb.h*k); const x = c.getContext('2d');
   x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height); x.scale(k,k); x.translate(-bb.x,-bb.y);
   const p = canvasPainter(x); const fp = bgFootprint(); if (fp) p.image(imgCache.get(job.bg.imgId).img, job.bg.x||0, job.bg.y||0, job.bg.w, job.bg.h, job.bg.rot||0);
-  const rs = resolveEnds(); const o = {field:false, selected:null, invalid:new Set(), ends: rs.ends, dom: dominantProfile()}; drawScene(p,o); drawPins(p,o); drawLegendCanvas(x, bb);
+  const rs = resolveEnds(); const o = {field:false, isSel: () => false, invalid:new Set(), ends: rs.ends, dom: dominantProfile()}; drawScene(p,o); drawPins(p,o); drawLegendCanvas(x, bb);
   deliver(dataURLtoBlob(c.toDataURL('image/png')), filenameBase()+'.png');
 }
 function drawLegendCanvas(x, bb){ const groups = activeGroups().filter(g=>g>0); if (!groups.length) return; let lx = bb.x+12, ly = bb.y+bb.h-18; x.font='700 12px Helvetica,Arial'; x.textBaseline='middle'; for (const g of groups) { x.fillStyle=GROUPS[g].c; x.fillRect(lx,ly-7,14,14); x.strokeStyle=NAVY; x.strokeRect(lx,ly-7,14,14); x.fillStyle=NAVY; x.textAlign='left'; x.fillText(GROUPS[g].n, lx+19, ly); lx += 19 + x.measureText(GROUPS[g].n).width + 16; } }
@@ -1118,7 +1164,7 @@ function exportPDF(){
   const area = {x:M, y:112, w:PW-2*M, h:560}; doc.setDrawColor(...navy); doc.setLineWidth(1); doc.rect(area.x,area.y,area.w,area.h);
   const bb = sceneBBox(); const k = Math.min(area.w/bb.w, area.h/bb.h); const ox = area.x + (area.w - bb.w*k)/2, oy = area.y + (area.h - bb.h*k)/2;
   const fp = bgFootprint(); if (fp) { try { doc.addImage(rotatedBgDataURL(), 'JPEG', ox+(fp.x-bb.x)*k, oy+(fp.y-bb.y)*k, fp.w*k, fp.h*k, undefined, 'FAST'); } catch(e){} }
-  const rs = resolveEnds(); const p = pdfPainter(doc, ox, oy, bb.x, bb.y, k); const o = {field:false, selected:null, invalid:new Set(), ends: rs.ends, dom: dominantProfile()}; drawScene(p,o); drawPins(p,o);
+  const rs = resolveEnds(); const p = pdfPainter(doc, ox, oy, bb.x, bb.y, k); const o = {field:false, isSel: () => false, invalid:new Set(), ends: rs.ends, dom: dominantProfile()}; drawScene(p,o); drawPins(p,o);
   // legend
   let ly = area.y+area.h+16; doc.setFontSize(8.5); doc.setFont('helvetica','bold'); doc.setTextColor(...navy);
   const groups = activeGroups().filter(g=>g>0); let lx = M;
@@ -1138,7 +1184,7 @@ function exportPDF(){
     doc.setFillColor(...navy); doc.rect(M, y-10, 268, 16, 'F'); doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.text(title + '   (from drawing)', M+6, y+1); y += 18;
     const profs = Object.keys(m.gutter); if (profs.length) profs.forEach(pr => line(`Gutter ${pr}`, fmtLF(m.gutter[pr]))); else line('Gutter','—');
     line('Gutter covers', fmtLF(m.coverLF)); line('End caps', m.endcaps); line('Miters — inside', m.miterIn); line('Miters — outside', m.miterOut); line('Miters — bay', m.miterBay);
-    line('Downspouts', m.ds); Object.keys(m.dsBySize).forEach(s => line(s, m.dsBySize[s], true)); Object.keys(m.dsByStory).sort((a,b)=>a-b).forEach(st => line(`${st} story`, m.dsByStory[st], true));
+    line('Downspouts', m.ds); Object.keys(m.dsBySize).forEach(s => line(s, m.dsBySize[s], true)); storyKeys(m.dsByStory).forEach(st => line(storyName(st==='LR'?'LR':+st), m.dsByStory[st], true));
     line('Elbows A', m.elbA); line('Elbows B', m.elbB); OFFSET_SIZES.forEach(sz => line(`Offsets ${sz}`, m.offsets[sz])); line('Outlets', m.outlets);
     const ovr = job.manual.straps[key]; line('Pipe bands' + (ovr!==undefined?` (override; auto ${m.straps})`:''), ovr!==undefined?ovr:m.straps);
     line('Splash guards', m.acc.splashguard); line('Splash blocks', m.acc.splashblock); line('Rain chains', m.acc.rainchain+m.rainchainTerm); line('Drip edge extensions', m.acc.dripedge);
