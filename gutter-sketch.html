@@ -224,8 +224,7 @@ body.full #contBar{bottom:16px}
               <button class="btn" data-tool="acc" data-sub="splashguard">Splash Guard</button>
               <button class="btn" data-tool="acc" data-sub="splashblock">Splash Block</button>
               <button class="btn" data-tool="acc" data-sub="dropoutlet">Drop Outlet ○</button>
-              <button class="btn" data-tool="acc" data-sub="dripedge">Drip Edge Ext.</button>
-              <button class="btn wide" data-tool="acc" data-sub="rainchain">Rain Chain</button>
+              <button class="btn" data-tool="acc" data-sub="rainchain">Rain Chain</button>
             </div>
           </div>
           <div class="pgroup"><h4>Story labels (drop on a section)</h4>
@@ -242,7 +241,6 @@ body.full #contBar{bottom:16px}
               <button class="btn" data-tool="haz" data-sub="ac">AC Unit</button>
               <button class="btn" data-tool="haz" data-sub="pool">Pool</button>
               <button class="btn" data-tool="haz" data-sub="dish">Sat. Dish</button>
-              <button class="btn" data-tool="haz" data-sub="septic">Septic/Well</button>
               <button class="btn" data-tool="haz" data-sub="power">Power Line</button>
               <button class="btn" data-tool="haz" data-sub="landscape">Landscaping</button>
               <button class="btn wide" data-tool="haz" data-sub="warn">⚠ Warning</button>
@@ -336,7 +334,7 @@ const storyLabel = s => s==='LR' ? 'LR' : `${s}st`;
 const storyName = s => s==='LR' ? 'Lower roof' : `${s} story`;
 const SEQ_TOKENS = ['A','B','2"','4"','6"'];             // elbow / offset tokens, tapped in order
 const OFFSET_SIZES = ['2"','4"','6"'];
-const CALLOUT_PRESETS = ['Tie-in', 'Tie-in to existing', 'Remove existing', 'Reuse existing DS'];
+const CALLOUT_PRESETS = ['Tie-in', 'Tear out', 'Reuse existing DS'];
 const DS_SIZES = ['3×4"','4" Round','4×5"','2×3"','Smooth Square'];                 // matches the Jobber "Downspout size" field
 const DS_SIZE_MAP = {'3x4':'3×4"','4" round':'4" Round','4x5':'4×5"','square':'Smooth Square'};
 const TERMS = [['splashblock','Splash block'],['drain','Drain'],['driveway','Driveway'],['rainchain','Rain chain'],['other','Other']];
@@ -510,8 +508,8 @@ function termLabel(code){ return (TERMS.find(e=>e[0]===code)||[code,code])[1]; }
 function seqText(seq){ if (!Array.isArray(seq)) return String(seq||''); let s=''; let prevLetter=false; for (const t of seq) { const letter = t==='A'||t==='B'; s += (s && !(letter && prevLetter)) ? ' '+t : t; prevLetter = letter; } return s; }
 function dominantProfile(){ const lf={}; for (const it of job.items) if (it.type==='run' && !it.existing) lf[it.profile||'?'] = (lf[it.profile||'?']||0) + (+it.len||0); let best=null, bv=-1; for (const k in lf) if (lf[k]>bv) { bv=lf[k]; best=k; } return best; }
 function runLabel(r, dom){
-  if (r.existing) return (r.len>0 ? `${r.len}'  ` : '') + 'existing' + (r.cover ? ' +cover' : '');
-  let s = `${r.len||'?'}'`; if (r.profile && r.profile!==dom) s += `  ${r.profile}`; if (r.story===2) s += '  2st'; if (r.cover) s += '  +cover'; return s;
+  if (r.existing) return (r.len>0 ? `${r.len}'  ` : '') + 'existing';
+  let s = `${r.len||'?'}'`; if (r.profile && r.profile!==dom) s += `  ${r.profile}`; if (r.story===2) s += '  2st'; return s;
 }
 const CK = (x,y) => `${Math.round(x)},${Math.round(y)}`;
 // Resolve 'auto' run ends: a shared endpoint is a miter (inside/outside from the house shape), a loose end is an end cap.
@@ -558,6 +556,7 @@ function drawRun(p, r, o){
     if (o.isSel(r.id)) p.line(r.x1,r.y1,r.x2,r.y2,{color:GOLD, width:14});
     p.line(r.x1,r.y1,r.x2,r.y2,{color:col, width: field?4:3, dash:[10,8]});
     if (r.cover) p.line(r.x1+px*7, r.y1+py*7, r.x2+px*7, r.y2+py*7, {color:ccol, width:2.5, dash:[6,4]});
+    if (r.de) p.line(r.x1-px*6, r.y1-py*6, r.x2-px*6, r.y2-py*6, {color:ccol, width:1.5});
     p.text(runLabel(r), mx + px*(r.cover?19:12)*sgn, my + py*(r.cover?19:12)*sgn, {size: field?13:11, bold:!!r.cover, color: r.cover?ccol:col, bg:'#fff', angle:ang});
     if (r.g) badge(p, mx - px*12*sgn, my - py*12*sgn, r.g, 6.5);
     if (o.isSel(r.id)) { p.circle(r.x1,r.y1,7,{fill:'#fff',color:NAVY,width:2}); p.circle(r.x2,r.y2,7,{fill:'#fff',color:NAVY,width:2}); }
@@ -568,6 +567,7 @@ function drawRun(p, r, o){
   if (!field && r.g===1) p.line(r.x1,r.y1,r.x2,r.y2,{color:NAVY, width:w+2});
   p.line(r.x1,r.y1,r.x2,r.y2,{color:col, width:w});
   if (r.cover) p.line(r.x1+px*7, r.y1+py*7, r.x2+px*7, r.y2+py*7, {color:col, width:2, dash:[6,4]});
+  if (r.de) p.line(r.x1-px*6, r.y1-py*6, r.x2-px*6, r.y2-py*6, {color:col, width:1.5});   // drip edge extension: thin solid line on the house side
   const e = o.ends && o.ends.get(r.id) || {l:'endcap', r:'endcap'};
   drawEndMark(p, r.x1, r.y1, ux, uy, e.l, col, w);
   drawEndMark(p, r.x2, r.y2, -ux, -uy, e.r, col, w);
@@ -604,7 +604,8 @@ function drawHaz(p, h, o){
   const col = o.field ? '#000' : RED;
   if (o.isSel(h.id)) p.circle(h.x,h.y,19,{fill:GOLD});
   if (h.sub==='warn') { p.poly([[h.x,h.y-13],[h.x+13,h.y+10],[h.x-13,h.y+10]],{fill:'#fff',color:col,width:3,close:true}); p.text('!', h.x, h.y+2, {size:14, bold:true, color:col}); }
-  else { p.circle(h.x,h.y,13,{fill:'#fff',color:col,width:3}); p.text(HAZ[h.sub].ab, h.x, h.y, {size: HAZ[h.sub].ab.length>2?7:10, bold:true, color:col}); }
+  else if (h.sub==='pool') { p.circle(h.x,h.y,39,{fill:'#fff',color:col,width:4}); p.text('POOL', h.x, h.y, {size:18, bold:true, color:col}); }
+  else { p.circle(h.x,h.y,13,{fill:'#fff',color:col,width:3}); p.text((HAZ[h.sub]||{ab:'?'}).ab, h.x, h.y, {size: (HAZ[h.sub]||{ab:'?'}).ab.length>2?7:10, bold:true, color:col}); }
 }
 function drawTag(p, t, o){ // story designator for a section of the house — informational, not counted
   const col = o.field ? '#000' : NAVY;
@@ -715,7 +716,7 @@ function hitTest(x, y){
     if (it.type==='run') d = segDist(x,y,it.x1,it.y1,it.x2,it.y2);
     else if (it.type==='ink') { for (let k=1;k<it.pts.length;k++){ d=Math.min(d, segDist(x,y,it.pts[k-1][0],it.pts[k-1][1],it.pts[k][0],it.pts[k][1])); } }
     else if (it.type==='text') d = Math.min(dist(x,y,it.x,it.y)-10, dist(x,y,it.lx,it.ly));
-    else d = dist(x,y,it.x,it.y) - 6;
+    else d = dist(x,y,it.x,it.y) - ((it.type==='haz' && it.sub==='pool') ? 34 : 6);
     if (d < bd) { bd = d; best = it; }
   }
   return best;
@@ -917,18 +918,24 @@ function confirmSheet(msg, okLabel, cb){ const ov = openSheet(`<h3>${esc(msg)}</
 /* ---------------- props panel (select tool) ---------------- */
 function hideProps(){ $('#props').classList.add('hidden'); }
 function showMultiProps(){
-  const el = $('#props'); const items = job.items.filter(i => multi.has(i.id)); if (!items.length) { el.innerHTML = `<h3>Multi-select</h3><div class="row">Tap items to add them to the selection. Tap again to remove.</div><div class="actions"><button class="btn ghost" id="pMultiOff">Done</button></div>`; el.classList.remove('hidden'); el.querySelector('#pMultiOff').onclick = () => setMultiMode(false); return; }
+  const el = $('#props'); const items = job.items.filter(i => multi.has(i.id));
+  const selAll = `<div class="row"><button class="btn sm" id="pSelAll">Select all</button><button class="btn sm" id="pSelRuns">All runs</button></div>`;
+  const wireSelAll = () => { el.querySelector('#pSelAll').onclick = () => { multi.clear(); job.items.forEach(i => multi.add(i.id)); showProps(); render(); }; el.querySelector('#pSelRuns').onclick = () => { multi.clear(); job.items.filter(i => i.type==='run').forEach(i => multi.add(i.id)); showProps(); render(); }; };
+  if (!items.length) { el.innerHTML = `<h3>Multi-select</h3><div class="row">Tap items to add them to the selection. Tap again to remove.</div>${selAll}<div class="actions"><button class="btn ghost" id="pMultiOff">Done</button></div>`; el.classList.remove('hidden'); el.querySelector('#pMultiOff').onclick = () => setMultiMode(false); wireSelAll(); return; }
   const groupable = items.filter(i => i.type!=='haz' && i.type!=='tag'); const runs = items.filter(i => i.type==='run');
   const cs = new Set(runs.map(r => !!r.cover)); const ccur = cs.size===1 ? ([...cs][0] ? '1' : '0') : null;
+  const ds2 = new Set(runs.map(r => !!r.de)); const dcur = ds2.size===1 ? ([...ds2][0] ? '1' : '0') : null;
   const gs = new Set(groupable.map(i => i.g||0)); const gcur = gs.size===1 ? [...gs][0] : null;
-  el.innerHTML = `<h3>${items.length} selected</h3>
+  el.innerHTML = `<h3>${items.length} selected</h3>${selAll}
     ${groupable.length ? `<div class="row"><label class="l">Move all to group</label>${segHTML('g', GROUPS.map((g,i)=>[i,g.short]), gcur)}</div>` : ''}
-    ${runs.length ? `<div class="row"><label class="l">Gutter covers on ${runs.length} run${runs.length>1?'s':''}</label>${segHTML('cover', [['0','Off'],['1','On']], ccur)}</div>` : ''}
+    ${runs.length ? `<div class="row"><label class="l">Gutter covers on ${runs.length} run${runs.length>1?'s':''}</label>${segHTML('cover', [['0','Off'],['1','On']], ccur)}</div><div class="row"><label class="l">Drip edge extension</label>${segHTML('de', [['0','No'],['1','Yes']], dcur)}</div>` : ''}
     <div class="row" style="font-size:12px">${items.filter(i=>i.type==='run').length} runs · ${items.filter(i=>i.type==='ds').length} downspouts · ${items.length - items.filter(i=>i.type==='run'||i.type==='ds').length} other</div>
     <div class="actions" style="justify-content:space-between"><button class="btn red" id="pMultiDel">Delete all</button><span><button class="btn" id="pMultiClear">Clear</button> <button class="btn ghost" id="pMultiOff">Done</button></span></div>`;
   el.classList.remove('hidden');
   wireSeg(el,'g', v => { snapshot(); groupable.forEach(i => i.g = +v); afterItemsChanged(); showProps(); });
   wireSeg(el,'cover', v => { snapshot(); runs.forEach(r => r.cover = v==='1'); afterItemsChanged(); showProps(); });
+  wireSeg(el,'de', v => { snapshot(); runs.forEach(r => r.de = v==='1'); afterItemsChanged(); showProps(); });
+  wireSelAll();
   el.querySelector('#pMultiDel').onclick = () => { snapshot(); job.items = job.items.filter(i => !multi.has(i.id)); multi.clear(); afterItemsChanged(); showProps(); };
   el.querySelector('#pMultiClear').onclick = () => { multi.clear(); showProps(); render(); };
   el.querySelector('#pMultiOff').onclick = () => setMultiMode(false);
@@ -940,10 +947,12 @@ function showProps(){
   let body = '';
   const rsv = it.type==='run' && !it.existing ? (resolveEnds().ends.get(it.id) || {l:'endcap', r:'endcap'}) : null;
   if (it.type==='run' && it.existing) body = `<div class="row"><b>Existing gutter — stays; not counted as gutter</b></div><div class="row"><label class="l">Length (ft, optional)</label><input type="number" inputmode="decimal" id="pLen" value="${it.len||''}" step="0.5"><button class="btn sm" id="pPad">Pad</button></div>
-    <div class="row"><label class="l">Add gutter cover</label>${segHTML('cover', [['0','No'],['1','Yes']], it.cover?'1':'0')}</div>`;
+    <div class="row"><label class="l">Add gutter cover</label>${segHTML('cover', [['0','No'],['1','Yes']], it.cover?'1':'0')}</div>
+    <div class="row"><label class="l">Drip edge extension</label>${segHTML('de', [['0','No'],['1','Yes']], it.de?'1':'0')}</div>`;
   else if (it.type==='run') body = `<div class="row"><label class="l">Length (ft)</label><input type="number" inputmode="decimal" id="pLen" value="${it.len||''}" step="0.5"><button class="btn sm" id="pPad">Pad</button></div>
     <div class="row"><label class="l">Profile</label>${segHTML('profile', PROFILES, it.profile)}</div>
     <div class="row"><label class="l">Gutter cover</label>${segHTML('cover', [['0','Off'],['1','On']], it.cover?'1':'0')}</div>
+    <div class="row"><label class="l">Drip edge extension</label>${segHTML('de', [['0','No'],['1','Yes']], it.de?'1':'0')}</div>
     <div class="row"><label class="l">Story</label>${segHTML('story', [[1,'1'],[2,'2']], it.story)}</div>
     <div class="row"><label class="l">Start end — now: ${esc(endLabel(rsv.l))}</label>${segHTML('lend', ENDS, it.lend||'auto')}</div>
     <div class="row"><label class="l">Finish end — now: ${esc(endLabel(rsv.r))}</label>${segHTML('rend', ENDS, it.rend||'auto')}</div>`;
@@ -959,6 +968,7 @@ function showProps(){
     const len = el.querySelector('#pLen'); len.addEventListener('change', () => { const n = parseFloat(len.value); upd(()=> it.len = n>0?n:0); });
     el.querySelector('#pPad').onclick = () => openLengthPad(null,null,it);
   }
+  if (it.type==='run') wireSeg(el,'de', v => upd(()=>{ it.de=v==='1'; }));
   if (it.type==='run' && it.existing) wireSeg(el,'cover', v => upd(()=>{ it.cover=v==='1'; }));
   if (it.type==='run' && !it.existing) {
     wireSeg(el,'profile', v => upd(()=>{ it.profile=v; job.defaults.profile=v; }));
@@ -1104,6 +1114,7 @@ function computeMaterials(gFilter, rs){ // gFilter: 'all' or group index; rs = r
   if (m.acc.splashguard) { const dom = dominantProfile() || Object.keys(m.gutter)[0] || '6" K'; m.sgLF = m.acc.splashguard * SPLASH_GUARD_LF; m.gutter[dom] = (m.gutter[dom]||0) + m.sgLF; }
   m.hangers = Math.ceil(m.newLF / 2);                                   // one hanger every 24"
   m.dropOutlets = m.acc.dropoutlet || 0;
+  m.de = job.items.some(i => inG(i) && i.type==='run' && i.de) || m.acc.dripedge > 0;
   const gc = job.manual.gutterColor; m.paint = (gc && !NO_PAINT_COLORS.includes(gc) && job.manual.wedges && job.manual.wedges!=='none') ? 1 : 0;
   // miters are counted per corner (a shared endpoint), not per run end
   for (const c of rs.corners) { if (gFilter!=='all' && !c.groups.includes(+gFilter)) continue; if (c.kind==='miter_in') m.miterIn++; else if (c.kind==='miter_out') m.miterOut++; else if (c.kind==='miter_bay') m.miterBay++; }
@@ -1140,7 +1151,7 @@ function renderMaterials(){
   html += `<tr><td>Pipe bands <span style="font-size:11px;color:#555">(auto ${m.straps})</span></td><td><input type="number" inputmode="numeric" id="strapOv" placeholder="${m.straps}" value="${ov??''}"></td></tr>`;
   const hov = job.manual.hangerOv[strapKey]; html += `<tr><td>Hangers <span style="font-size:11px;color:#555">(auto ${m.hangers} = ${fmtLF(m.newLF)} ÷ 2)</span></td><td><input type="number" inputmode="numeric" id="hangerOv" placeholder="${m.hangers}" value="${hov??''}"></td></tr>`;
   html += row('Spray paint', m.paint ? `1 can — ${esc(colorName(job.manual.gutterColor, job.manual.gutterCustom))}` : '0');
-  html += row('Splash guards', m.acc.splashguard, mm => mm.acc.splashguard||'') + row('Splash blocks', m.acc.splashblock, mm => mm.acc.splashblock||'') + row('Rain chains', m.acc.rainchain + m.rainchainTerm, mm => (mm.acc.rainchain+mm.rainchainTerm)||'') + row('Drip edge extensions', m.acc.dripedge, mm => mm.acc.dripedge||'');
+  html += row('Splash guards', m.acc.splashguard, mm => mm.acc.splashguard||'') + row('Splash blocks', m.acc.splashblock, mm => mm.acc.splashblock||'') + row('Rain chains', m.acc.rainchain + m.rainchainTerm, mm => (mm.acc.rainchain+mm.rainchainTerm)||'') + row('Drip edge extension', m.de ? 'Yes' : 'No', mm => mm.de ? 'Yes' : '');
   html += `</table>`;
   $('#mAuto').innerHTML = html;
   $('#strapOv').addEventListener('change', e => { const v = e.target.value.trim(); if (v==='') delete job.manual.straps[strapKey]; else job.manual.straps[strapKey] = +v; touch(); });
@@ -1221,7 +1232,7 @@ function exportPDF(){
   if (groups.length) { doc.text('OPTIONS:', lx, ly); lx += 48; for (const g of groups) { const c=GROUPS[g].c; doc.setFillColor(parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16)); doc.setDrawColor(...navy); doc.rect(lx, ly-7, 10, 10, 'FD'); doc.setFont('helvetica','normal'); doc.text(`${g} = ${GROUPS[g].n}`, lx+14, ly); lx += 14 + doc.getTextWidth(`${g} = ${GROUPS[g].n}`) + 14; } ly += 14; lx = M; }
   doc.setFont('helvetica','normal'); doc.setFontSize(8);
   doc.text('MARKS:  cross tick = end cap   |   corners = miters (inside/outside counted on page 2)   |   BAY chip = bay miter   |   dashed tail = continues   |   circle = drop outlet', M, ly); ly += 11;
-  doc.text('DOWNSPOUT label = elbows/offsets top to bottom + story (e.g. "AA 2\" 2\" B 2st").  Dashed line beside a run = gutter cover.', M, ly); ly += 11;
+  doc.text('DOWNSPOUT label = elbows/offsets top to bottom + story (e.g. "AA 2\" 2\" B 2st").  Dashed line beside a run = gutter cover; thin solid line inside a run = drip edge extension.', M, ly); ly += 11;
   doc.text('Grey dashed run = EXISTING gutter, not counted.  Hollow slashed square = existing downspout to REUSE (not counted).  Red-orange circles = hazards / attention (not counted).', M, ly); ly += 11;
   doc.setFont('helvetica','bold'); doc.text('Schematic — NOT TO SCALE. Lengths are field measurements in feet.', M, ly);
   // ---- page 2: material list
@@ -1240,7 +1251,7 @@ function exportPDF(){
     const ovr = job.manual.straps[key]; line('Pipe bands' + (ovr!==undefined?` (override; auto ${m.straps})`:''), ovr!==undefined?ovr:m.straps);
     const hov = job.manual.hangerOv[key]; line('Hangers' + (hov!==undefined?` (override; auto ${m.hangers})`:` (${fmtLF(m.newLF)} / 2)`), hov!==undefined?hov:m.hangers);
     line('Spray paint', m.paint ? `1 can - ${colorName(job.manual.gutterColor, job.manual.gutterCustom)}` : 0);
-    line('Splash guards', m.acc.splashguard); line('Splash blocks', m.acc.splashblock); line('Rain chains', m.acc.rainchain+m.rainchainTerm); line('Drip edge extensions', m.acc.dripedge);
+    line('Splash guards', m.acc.splashguard); line('Splash blocks', m.acc.splashblock); line('Rain chains', m.acc.rainchain+m.rainchainTerm); line('Drip edge extension', m.de ? 'Yes' : 'No');
     y += 10;
   }
   // manual fields column (page 2, right side)
