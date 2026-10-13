@@ -542,6 +542,25 @@ function resolveEnds(){
   return {ends: res, corners: out};
 }
 
+// ---- label collision avoidance ----------------------------------------------------
+function rectSegDist(r, x1,y1,x2,y2){ // min distance from a segment to an axis-aligned rect (0 = touches/crosses)
+  let best = Infinity; for (let i=0;i<=12;i++){ const t=i/12, px=x1+(x2-x1)*t, py=y1+(y2-y1)*t; const dx=Math.max(r.x-px, 0, px-(r.x+r.w)), dy=Math.max(r.y-py, 0, py-(r.y+r.h)); best=Math.min(best, Math.hypot(dx,dy)); } return best; }
+function rectOverlap(a,b){ const w=Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x), h=Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y); return (w>0&&h>0) ? w*h : 0; }
+function textW(str, size){ return str.length*size*0.58 + size*0.7; }
+// pick the clearest spot for a label block of (w,h) around an item at (x,y) with a keep-out radius
+function placeLabel(o, x, y, w, h, keep, prefer){
+  const cands = [[0,1],[0,-1],[1,0],[-1,0],[1,1],[-1,1],[1,-1],[-1,-1]];
+  let best=null, bs=Infinity;
+  cands.forEach(([dx,dy],i) => {
+    const cx = x + dx*(keep + w/2*Math.abs(dx)) , cy = y + dy*(keep + h/2*Math.abs(dy));
+    const r = {x:cx-w/2, y:cy-h/2, w, h}; let s = i*2 + (prefer===i ? -3 : 0);
+    for (const it of job.items) { if (it.type==='run') { const d = rectSegDist(r, it.x1,it.y1,it.x2,it.y2); if (d===0) s += 120; else if (d < 8) s += 30; }
+      else if ((it.type==='ds' || it.type==='acc' || it.type==='haz') && !(it.x===x && it.y===y)) { const d = rectSegDist(r, it.x,it.y,it.x,it.y); if (d < 10) s += 60; } }
+    for (const pr of (o.placed||[])) { const ov = rectOverlap(r, pr); if (ov) s += 40 + ov/20; }
+    if (s < bs) { bs = s; best = {cx, cy, r}; }
+  });
+  (o.placed ||= []).push(best.r); return best;
+}
 function drawEndMark(p, x, y, ux, uy, kind, col, w){
   // ux,uy = unit vector pointing INTO the run from this end; perpendicular = (-uy, ux)
   const px=-uy, py=ux, L=9;
@@ -563,7 +582,9 @@ function drawRun(p, r, o){
     p.line(r.x1,r.y1,r.x2,r.y2,{color:col, width: field?4:3, dash:[10,8]});
     if (r.cover) p.line(r.x1+px*7, r.y1+py*7, r.x2+px*7, r.y2+py*7, {color:ccol, width:2.5, dash:[6,4]});
     if (r.de) p.line(r.x1-px*6, r.y1-py*6, r.x2-px*6, r.y2-py*6, {color:ccol, width:1.5});
-    p.text(runLabel(r), mx + px*(r.cover?19:12)*sgn, my + py*(r.cover?19:12)*sgn, {size: field?13:11, bold:!!r.cover, color: r.cover?ccol:col, bg:'#fff', angle:ang});
+    { const lbl = runLabel(r), lsz = field?13:11, LX = mx + px*(r.cover?19:12)*sgn, LY = my + py*(r.cover?19:12)*sgn, horiz = Math.abs(Math.cos(ang)) > 0.7, tw = textW(lbl, lsz), th = lsz*1.35;
+      (o.placed ||= []).push(horiz ? {x:LX-tw/2, y:LY-th/2, w:tw, h:th} : {x:LX-th/2, y:LY-tw/2, w:th, h:tw});
+      p.text(lbl, LX, LY, {size: lsz, bold:!!r.cover, color: r.cover?ccol:col, bg:'#fff', angle:ang}); }
     if (r.g) badge(p, mx - px*12*sgn, my - py*12*sgn, r.g, 6.5);
     if (o.isSel(r.id)) { p.circle(r.x1,r.y1,7,{fill:'#fff',color:NAVY,width:2}); p.circle(r.x2,r.y2,7,{fill:'#fff',color:NAVY,width:2}); }
     return;
@@ -577,19 +598,32 @@ function drawRun(p, r, o){
   const e = o.ends && o.ends.get(r.id) || {l:'endcap', r:'endcap'};
   drawEndMark(p, r.x1, r.y1, ux, uy, e.l, col, w);
   drawEndMark(p, r.x2, r.y2, -ux, -uy, e.r, col, w);
-  const off = r.cover ? 20 : 13;
-  p.text(runLabel(r, o.dom), mx + px*off*sgn, my + py*off*sgn, {size: field?15:12, bold:true, color: col, bg:'#fff', angle: ang});
+  const off = r.cover ? 20 : 13; const lbl = runLabel(r, o.dom), lsz = field?15:12, LX = mx + px*off*sgn, LY = my + py*off*sgn;
+  { const horiz = Math.abs(Math.cos(ang)) > 0.7, tw = textW(lbl, lsz), th = lsz*1.35; (o.placed ||= []).push(horiz ? {x:LX-tw/2, y:LY-th/2, w:tw, h:th} : {x:LX-th/2, y:LY-tw/2, w:th, h:tw}); }
+  p.text(lbl, LX, LY, {size: lsz, bold:true, color: col, bg:'#fff', angle: ang});
   if (r.g) badge(p, mx - px*12*sgn, my - py*12*sgn, r.g, 6.5);
   if (o.isSel(r.id)) { p.circle(r.x1,r.y1,7,{fill:'#fff',color:NAVY,width:2}); p.circle(r.x2,r.y2,7,{fill:'#fff',color:NAVY,width:2}); }
 }
+const dsLabelPos = new Map();   // id -> {x,y} of the label block centre, for drag-to-move in Select
 function drawDS(p, d, o){
   const field=o.field, col = o.invalid?.has(d.id) ? ERR : groupColor(d.g, field), s=16;
   if (o.isSel(d.id)) p.circle(d.x,d.y,s*1.1,{fill:GOLD});
-  if (d.status==='reuse') { p.rect(d.x-s/2, d.y-s/2, s, s, {fill:'#fff', color:col, width:2.5}); p.line(d.x-s/2, d.y+s/2, d.x+s/2, d.y-s/2, {color:col, width:2}); p.text(`REUSE ${d.story?storyLabel(d.story):''}`.trim(), d.x, d.y+s/2+10, {size: field?13:10, bold:true, color:col, bg:'#fff'}); }
-  else { p.rect(d.x-s/2, d.y-s/2, s, s, {fill:col, color: d.g===1?NAVY:undefined, width:1.5});
-  p.text(`${seqText(d.seq)||'?'} ${d.story?storyLabel(d.story):'?'}`, d.x, d.y+s/2+10, {size: field?14:11, bold:true, color:col, bg:'#fff'}); }
-  if (!field && d.size && d.size!=='3×4"') p.text(d.size, d.x, d.y+s/2+23, {size:9, color:col, bg:'#fff'});
+  const reuse = d.status==='reuse';
+  if (reuse) { p.rect(d.x-s/2, d.y-s/2, s, s, {fill:'#fff', color:col, width:2.5}); p.line(d.x-s/2, d.y+s/2, d.x+s/2, d.y-s/2, {color:col, width:2}); }
+  else p.rect(d.x-s/2, d.y-s/2, s, s, {fill:col, color: d.g===1?NAVY:undefined, width:1.5});
+  const l1 = reuse ? `REUSE ${d.story?storyLabel(d.story):''}`.trim() : `${seqText(d.seq)||'?'} ${d.story?storyLabel(d.story):'?'}`;
+  const s1 = field ? (reuse?13:14) : (reuse?10:11), l2 = (!field && !reuse && d.size && d.size!=='3×4"') ? d.size : null, s2 = 9;
+  const w = Math.max(textW(l1, s1), l2 ? textW(l2, s2) : 0), h = s1*1.35 + (l2 ? s2*1.35 + 1 : 0);
+  let cx, cy;
+  if (d.lo) { cx = d.x + d.lo[0]; cy = d.y + d.lo[1]; (o.placed ||= []).push({x:cx-w/2, y:cy-h/2, w, h}); }
+  else { const best = placeLabel(o, d.x, d.y, w, h, s/2 + 4, 0); cx = best.cx; cy = best.cy; }
+  dsLabelPos.set(d.id, {x:cx, y:cy, w, h});
+  if (Math.hypot(cx-d.x, cy-d.y) > s + 22) p.line(d.x, d.y, cx, cy, {color:col, width:1, dash:[3,3]});   // far label: thin leader
+  const y1 = l2 ? cy - (s2*1.35+1)/2 : cy;
+  p.text(l1, cx, y1, {size:s1, bold:true, color:col, bg:'#fff'});
+  if (l2) p.text(l2, cx, y1 + s1*0.7 + s2*0.7, {size:s2, color:col, bg:'#fff'});
   if (d.g) badge(p, d.x+s/2+4, d.y-s/2-4, d.g, 7);
+  if (o.isSel(d.id) && !field) p.circle(cx + w/2, cy - h/2, 5, {fill:GOLD, color:NAVY, width:1.5});   // label grab handle
 }
 function drawAcc(p, a, o){
   const col = o.invalid?.has(a.id) ? ERR : groupColor(a.g, o.field); const r = a.rot||0, c=Math.cos(r*Math.PI/2), s=Math.sin(r*Math.PI/2);
@@ -654,7 +688,7 @@ function render(){
   if (job.bg.type==='image') { const rec = imgCache.get(job.bg.imgId); if (rec) canvasPainter(ctx).image(rec.img, job.bg.x||0, job.bg.y||0, job.bg.w, job.bg.h, job.bg.rot||0); else drawGrid(ctx); } else drawGrid(ctx);
   const p = canvasPainter(ctx);
   const rs = resolveEnds();
-  const o = {field:isField(), isSel: id => id===sel || multi.has(id), invalid: invalidSet(), highlightPin, ends: rs.ends, dom: dominantProfile()};
+  const o = {field:isField(), isSel: id => id===sel || multi.has(id), invalid: invalidSet(), highlightPin, ends: rs.ends, dom: dominantProfile(), placed: []};
   drawScene(p, o);
   if (!o.field && tool==='select') for (const c of rs.corners) if (c.kind!=='seam') p.circle(c.x, c.y, 11, {color: c.auto ? 'rgba(0,23,56,0.25)' : GOLD, width:2});
   drawPins(p, o);
@@ -759,6 +793,7 @@ function beginGesture(w, e){
       const hr = 14/job.view.s;
       if (it.type==='run') { if (dist(w.x,w.y,it.x1,it.y1)<hr) return {kind:'endpoint', it, end:1}; if (dist(w.x,w.y,it.x2,it.y2)<hr) return {kind:'endpoint', it, end:2}; }
       if (it.type==='text' && dist(w.x,w.y,it.lx,it.ly)<hr) return {kind:'anchor', it};
+      if (it.type==='ds') { const lp = dsLabelPos.get(it.id); if (lp && w.x > lp.x-lp.w/2-4 && w.x < lp.x+lp.w/2+4 && w.y > lp.y-lp.h/2-4 && w.y < lp.y+lp.h/2+4) return {kind:'dslabel', it}; }
     }
     const pin = hitPin(w.x,w.y); if (pin) return {kind:'pin', pin, ox:pin.x, oy:pin.y, start:w, snap:false};
     const corner = resolveEnds().corners.find(c => c.kind!=='seam' && dist(w.x,w.y,c.x,c.y) < 14/job.view.s); if (corner) return {kind:'corner', corner};
@@ -784,6 +819,7 @@ cv.addEventListener('pointermove', e => {
   if (gesture.kind==='move') { if (!p.moved) return; if (!gesture.snapped) { snapshot(); gesture.snapped = true; } const dx = w.x-gesture.start.x, dy = w.y-gesture.start.y; gesture.items.forEach((it,i) => moveItem(it, JSON.parse(gesture.origs[i]), dx, dy)); render(); return; }
   if (gesture.kind==='endpoint') { if (!p.moved) return; if (!gesture.snapped) { snapshot(); gesture.snapped = true; } const s2 = snapPt(w.x,w.y,gesture.it.id); if (gesture.end===1) { gesture.it.x1=s2.x; gesture.it.y1=s2.y; } else { gesture.it.x2=s2.x; gesture.it.y2=s2.y; } render(); return; }
   if (gesture.kind==='anchor') { if (!p.moved) return; if (!gesture.snapped) { snapshot(); gesture.snapped = true; } gesture.it.lx=w.x; gesture.it.ly=w.y; render(); return; }
+  if (gesture.kind==='dslabel') { if (!p.moved) return; if (!gesture.snapped) { snapshot(); gesture.snapped = true; } gesture.it.lo = [Math.round(w.x-gesture.it.x), Math.round(w.y-gesture.it.y)]; render(); return; }
   if (gesture.kind==='pin') { if (!p.moved) return; gesture.pin.x = gesture.ox + (w.x-gesture.start.x); gesture.pin.y = gesture.oy + (w.y-gesture.start.y); render(); return; }
 });
 function moveItem(it, o, dx, dy){
@@ -800,7 +836,7 @@ function endPointer(e){
   if (!g) return;
   if (g.kind==='ink') { const pts = inkPreview; inkPreview = null; if (pts && pts.length>1) { snapshot(); job.items.push({type:'ink', id:uid(), g:curGroup, color:inkColor, w:inkW, pts: simplify(pts)}); afterItemsChanged(); } else render(); return; }
   if (g.kind==='rundrag') { runPreview = null; if (p.moved) { const s2 = snapPt(w.x,w.y); if (dist(g.start.x,g.start.y,s2.x,s2.y) > 4) { openLengthPad(g.start, s2); return; } } else { tapRun(w); } render(); return; }
-  if (g.kind==='move' || g.kind==='endpoint' || g.kind==='anchor') { if (p.moved) { afterItemsChanged(); showProps(); } else if (g.kind==='move') { if (tap) selectItem(g.it); } return; }
+  if (g.kind==='move' || g.kind==='endpoint' || g.kind==='anchor' || g.kind==='dslabel') { if (p.moved) { afterItemsChanged(); showProps(); } else if (g.kind==='move') { if (tap) selectItem(g.it); } return; }
   if (g.kind==='pin') { if (p.moved) { touch(); render(); } else if (tap) openPhotoViewer(g.pin.id); return; }
   if (g.kind==='corner') { if (tap) cycleCorner(g.corner); return; }
   if (g.kind==='pan' && tap) handleTap(w, e);
@@ -962,7 +998,7 @@ function showProps(){
     <div class="row"><label class="l">Story</label>${segHTML('story', [[1,'1'],[2,'2']], it.story)}</div>
     <div class="row"><label class="l">Start end — now: ${esc(endLabel(rsv.l))}</label>${segHTML('lend', ENDS, it.lend||'auto')}</div>
     <div class="row"><label class="l">Finish end — now: ${esc(endLabel(rsv.r))}</label>${segHTML('rend', ENDS, it.rend||'auto')}</div>`;
-  else if (it.type==='ds') body = `<div class="row"><b>${it.status==='reuse'?'REUSE EXISTING · ':''}${esc(it.size)} · ${esc(seqText(it.seq)||'—')} · ${esc(storyName(it.story))} · ${esc(termLabel(it.term))}</b></div><div class="row">${it.note?esc(it.note):''}</div><div class="row"><button class="btn" id="pEditDs">Edit fields</button></div>`;
+  else if (it.type==='ds') body = `<div class="row"><b>${it.status==='reuse'?'REUSE EXISTING · ':''}${esc(it.size)} · ${esc(seqText(it.seq)||'—')} · ${esc(storyName(it.story))} · ${esc(termLabel(it.term))}</b></div><div class="row">${it.note?esc(it.note):''}</div><div class="row"><button class="btn" id="pEditDs">Edit fields</button>${it.lo?'<button class="btn ghost" id="pLblReset">Auto-place label</button>':''}</div><div class="row" style="font-size:12px">Drag the label (gold dot) to move it.</div>`;
   else if (it.type==='text') body = `<div class="row"><b>${esc(it.text)}</b></div><div class="row"><button class="btn" id="pEditTx">Edit text</button></div>`;
   else if (it.type==='ink') body = `<div class="row"><label class="l">Color</label>${segHTML('color', [['#000000','Black'],['#001738','Navy'],['#F15D22','Red-orange']], it.color)}</div><div class="row"><label class="l">Width</label>${segHTML('w', [[3,'Thin'],[7,'Thick']], it.w)}</div>`;
   const title = it.type==='tag' ? `${it.story}-story label` : it.type==='run'?(it.existing?'Existing gutter':'Gutter run'): it.type==='ds'?'Downspout': it.type==='acc'?ACC[it.sub].n: it.type==='haz'?HAZ[it.sub].n: it.type==='ink'?'Ink stroke':'Text callout';
@@ -983,7 +1019,7 @@ function showProps(){
     wireSeg(el,'lend', v => upd(()=>{ it.lend=v; }));
     wireSeg(el,'rend', v => upd(()=>{ it.rend=v; }));
   }
-  if (it.type==='ds') el.querySelector('#pEditDs').onclick = () => openDsSheet(null, it);
+  if (it.type==='ds') { el.querySelector('#pEditDs').onclick = () => openDsSheet(null, it); const rb = el.querySelector('#pLblReset'); if (rb) rb.onclick = () => upd(()=> { delete it.lo; }); }
   if (it.type==='text') el.querySelector('#pEditTx').onclick = () => openTextSheet(null, it);
   if (it.type==='ink') { wireSeg(el,'color', v => upd(()=> it.color=v)); wireSeg(el,'w', v => upd(()=> it.w=+v)); }
   const rot = el.querySelector('#pRot'); if (rot) rot.onclick = () => upd(()=> it.rot = ((it.rot||0)+1)%4);
@@ -1214,7 +1250,7 @@ function exportPNG(){
   const bb = sceneBBox(); const k = Math.min(3, 3000/bb.w, 3000/bb.h); const c = document.createElement('canvas'); c.width = Math.round(bb.w*k); c.height = Math.round(bb.h*k); const x = c.getContext('2d');
   x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height); x.scale(k,k); x.translate(-bb.x,-bb.y);
   const p = canvasPainter(x); const fp = bgFootprint(); if (fp) p.image(imgCache.get(job.bg.imgId).img, job.bg.x||0, job.bg.y||0, job.bg.w, job.bg.h, job.bg.rot||0);
-  const rs = resolveEnds(); const o = {field:false, isSel: () => false, invalid:new Set(), ends: rs.ends, dom: dominantProfile()}; drawScene(p,o); drawPins(p,o); drawLegendCanvas(x, bb);
+  const rs = resolveEnds(); const o = {field:false, isSel: () => false, invalid:new Set(), ends: rs.ends, dom: dominantProfile(), placed: []}; drawScene(p,o); drawPins(p,o); drawLegendCanvas(x, bb);
   try { const bw = Math.min(140, bb.w*0.18), bh = bw/1.42; x.drawImage(BRAND_IMG.badge, bb.x+bb.w-bw-10, bb.y+bb.h-bh-10, bw, bh); } catch(e){}
   deliver(dataURLtoBlob(c.toDataURL('image/png')), filenameBase()+'.png');
 }
@@ -1243,7 +1279,7 @@ function exportPDF(){
   const area = {x:M, y:122, w:PW-2*M, h:530}; doc.setDrawColor(...navy); doc.setLineWidth(1); doc.rect(area.x,area.y,area.w,area.h);
   const bb = sceneBBox(); const k = Math.min(area.w/bb.w, area.h/bb.h); const ox = area.x + (area.w - bb.w*k)/2, oy = area.y + (area.h - bb.h*k)/2;
   const fp = bgFootprint(); if (fp) { try { doc.addImage(rotatedBgDataURL(), 'JPEG', ox+(fp.x-bb.x)*k, oy+(fp.y-bb.y)*k, fp.w*k, fp.h*k, undefined, 'FAST'); } catch(e){} }
-  const rs = resolveEnds(); const p = pdfPainter(doc, ox, oy, bb.x, bb.y, k); const o = {field:false, isSel: () => false, invalid:new Set(), ends: rs.ends, dom: dominantProfile()}; drawScene(p,o); drawPins(p,o);
+  const rs = resolveEnds(); const p = pdfPainter(doc, ox, oy, bb.x, bb.y, k); const o = {field:false, isSel: () => false, invalid:new Set(), ends: rs.ends, dom: dominantProfile(), placed: []}; drawScene(p,o); drawPins(p,o);
   // legend
   let ly = area.y+area.h+16; doc.setFontSize(8.5); doc.setFont('helvetica','bold'); doc.setTextColor(...navy);
   const groups = activeGroups().filter(g=>g>0); let lx = M;
