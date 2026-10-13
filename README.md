@@ -23,12 +23,15 @@ To roll back: repo page → **commits** → pick the older version → view the 
 
 ## Files
 
-- `gutter-sketch.html` — the entire app, one file (HTML/CSS/JS, no build step, no backend)
+- `gutter-sketch.html` — the entire app, one file (HTML/CSS/JS, no build step, no backend); the brand badge and mascot are embedded inside it
+- `icon-180.png` — the home-screen icon (badge on cream)
 - `README.md` — this file
 
 Keep it that way. No customer data, exports, credentials or other files belong in this repo — it is public.
 
 ## Version history
+
+- **v2.4** (2026-10-13) — branded exports per the KickCharge brand guide: navy header band with gold/orange rule, Sergeant Seamless badge top-left, cream customer strip, mascot beside the legend, navy footer with address / email / phone / web on every page, section bars in navy + gold; PNG export carries the badge; home-screen icon is now the badge (`icon-180.png`).
 
 - **v2.3** (2026-10-13) — Multi panel gets **Select all** / **All runs**; pool icon 3×; run labels no longer say "+cover" (the dashed line carries it); callout presets are Tie-in / Tear out / Reuse existing DS; Septic/Well hazard removed; **drip edge extension is now a per-run Yes/No** (thin solid line on the house side of the run, "Drip edge extension: Yes/No" on the material list) instead of a placed icon.
 
