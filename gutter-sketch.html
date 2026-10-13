@@ -564,8 +564,9 @@ function drawRun(p, r, o){
 function drawDS(p, d, o){
   const field=o.field, col = o.invalid?.has(d.id) ? ERR : groupColor(d.g, field), s=16;
   if (o.isSel(d.id)) p.circle(d.x,d.y,s*1.1,{fill:GOLD});
-  p.rect(d.x-s/2, d.y-s/2, s, s, {fill:col, color: d.g===1?NAVY:undefined, width:1.5});
-  p.text(`${seqText(d.seq)||'?'} ${d.story?storyLabel(d.story):'?'}`, d.x, d.y+s/2+10, {size: field?14:11, bold:true, color:col, bg:'#fff'});
+  if (d.status==='reuse') { p.rect(d.x-s/2, d.y-s/2, s, s, {fill:'#fff', color:col, width:2.5}); p.line(d.x-s/2, d.y+s/2, d.x+s/2, d.y-s/2, {color:col, width:2}); p.text(`REUSE ${d.story?storyLabel(d.story):''}`.trim(), d.x, d.y+s/2+10, {size: field?13:10, bold:true, color:col, bg:'#fff'}); }
+  else { p.rect(d.x-s/2, d.y-s/2, s, s, {fill:col, color: d.g===1?NAVY:undefined, width:1.5});
+  p.text(`${seqText(d.seq)||'?'} ${d.story?storyLabel(d.story):'?'}`, d.x, d.y+s/2+10, {size: field?14:11, bold:true, color:col, bg:'#fff'}); }
   if (!field && d.size && d.size!=='3x4') p.text(d.size, d.x, d.y+s/2+23, {size:9, color:col, bg:'#fff'});
   if (d.g) badge(p, d.x+s/2+4, d.y-s/2-4, d.g, 7);
 }
@@ -859,10 +860,11 @@ function openLengthPad(start, end, existing){
 
 function openDsSheet(w, existing){
   const d = job.defaults; const field = isField();
-  const cur = existing || {size:d.dsSize, story:d.dsStory, seq:[], term:d.dsTerm, note:'', g:curGroup};
+  const cur = existing || {size:d.dsSize, story:d.dsStory, seq:[], term:d.dsTerm, note:'', g:curGroup, status:'new'};
   let seq = Array.isArray(cur.seq) ? [...cur.seq] : [];
   const ov = openSheet(`<h3>${existing?'Edit downspout':'Downspout'}</h3>
     ${field?'':`<div class="row"><label class="l">Size</label>${segHTML('size', DS_SIZES, cur.size)}</div>`}
+    <div class="row"><label class="l">Downspout is</label>${segHTML('status', [['new','NEW (install)'],['reuse','REUSE EXISTING']], cur.status||'new', true)}</div>
     <div class="row"><label class="l">Story</label>${segHTML('story', STORIES, cur.story, true)}</div>
     <div class="row"><label class="l">Elbows &amp; offsets (tap in order, top to bottom)</label>
       <div class="seg big" id="seqKeys">${SEQ_TOKENS.map(t=>`<button class="btn" data-e="${esc(t)}">${esc(t)}</button>`).join('')}<button class="btn" data-e="bs">⌫</button></div>
@@ -876,9 +878,10 @@ function openDsSheet(w, existing){
   ov.querySelector('#dsCancel').onclick = () => { closeSheet(); render(); };
   ov.querySelector('#dsDone').onclick = () => {
     const sv = segVal(ov,'story'); const story = sv==='LR' ? 'LR' : +sv; const size = field ? cur.size : segVal(ov,'size'); const term = field ? cur.term : segVal(ov,'term'); const note = field ? (cur.note||'') : ov.querySelector('#dsNote').value.trim(); const g = field ? (cur.g??0) : +segVal(ov,'g');
-    if (!seq.length) { toast('Enter the elbow sequence (A / B / offsets)'); return; }
+    const status = segVal(ov,'status') || 'new';
+    if (!seq.length && status!=='reuse') { toast('Enter the elbow sequence (A / B / offsets)'); return; }
     closeSheet(); snapshot();
-    if (existing) Object.assign(existing, {story,size,term,note,seq,g}); else job.items.push({type:'ds', id:uid(), g, x:w.x, y:w.y, size, story, seq, term, note});
+    if (existing) Object.assign(existing, {story,size,term,note,seq,g,status}); else job.items.push({type:'ds', id:uid(), g, x:w.x, y:w.y, size, story, seq, term, note, status});
     Object.assign(job.defaults, {dsSize:size, dsStory:story, dsTerm:term});
     afterItemsChanged(); if (existing) showProps();
   };
@@ -924,7 +927,7 @@ function showProps(){
     <div class="row"><label class="l">Story</label>${segHTML('story', [[1,'1'],[2,'2']], it.story)}</div>
     <div class="row"><label class="l">Start end — now: ${esc(endLabel(rsv.l))}</label>${segHTML('lend', ENDS, it.lend||'auto')}</div>
     <div class="row"><label class="l">Finish end — now: ${esc(endLabel(rsv.r))}</label>${segHTML('rend', ENDS, it.rend||'auto')}</div>`;
-  else if (it.type==='ds') body = `<div class="row"><b>${esc(it.size)} · ${esc(seqText(it.seq)||'?')} · ${esc(storyName(it.story))} · ${esc(termLabel(it.term))}</b></div><div class="row">${it.note?esc(it.note):''}</div><div class="row"><button class="btn" id="pEditDs">Edit fields</button></div>`;
+  else if (it.type==='ds') body = `<div class="row"><b>${it.status==='reuse'?'REUSE EXISTING · ':''}${esc(it.size)} · ${esc(seqText(it.seq)||'—')} · ${esc(storyName(it.story))} · ${esc(termLabel(it.term))}</b></div><div class="row">${it.note?esc(it.note):''}</div><div class="row"><button class="btn" id="pEditDs">Edit fields</button></div>`;
   else if (it.type==='text') body = `<div class="row"><b>${esc(it.text)}</b></div><div class="row"><button class="btn" id="pEditTx">Edit text</button></div>`;
   else if (it.type==='ink') body = `<div class="row"><label class="l">Color</label>${segHTML('color', [['#000000','Black'],['#001738','Navy'],['#F15D22','Red-orange']], it.color)}</div><div class="row"><label class="l">Width</label>${segHTML('w', [[3,'Thin'],[7,'Thick']], it.w)}</div>`;
   const title = it.type==='tag' ? `${it.story}-story label` : it.type==='run'?(it.existing?'Existing gutter':'Gutter run'): it.type==='ds'?'Downspout': it.type==='acc'?ACC[it.sub].n: it.type==='haz'?HAZ[it.sub].n: it.type==='ink'?'Ink stroke':'Text callout';
@@ -1041,12 +1044,12 @@ $('#bgInput').addEventListener('change', async e => {
 });
 
 /* ---------------- validation ---------------- */
-function invalidSet(){ const s = new Set(); if (!job) return s; for (const it of job.items) { if (it.type==='run' && !it.existing && !(it.len>0)) s.add(it.id); if (it.type==='ds' && !(it.size && it.story && it.seq && it.seq.length && it.term)) s.add(it.id); } return s; }
+function invalidSet(){ const s = new Set(); if (!job) return s; for (const it of job.items) { if (it.type==='run' && !it.existing && !(it.len>0)) s.add(it.id); if (it.type==='ds' && !(it.size && it.story && it.term && (it.status==='reuse' || (it.seq && it.seq.length)))) s.add(it.id); } return s; }
 function validationProblems(){
   const probs = [];
   if (!job.customer.trim()) probs.push('Customer name is blank');
   if (!job.address.trim()) probs.push('Address is blank');
-  let r=0, d=0; for (const it of job.items) { if (it.type==='run' && !it.existing && !(it.len>0)) r++; if (it.type==='ds') { const miss=[]; if(!it.size) miss.push('size'); if(!it.story) miss.push('story'); if(!it.seq || !it.seq.length) miss.push('elbow sequence'); if(!it.term) miss.push('termination'); if (miss.length) d++; } }
+  let r=0, d=0; for (const it of job.items) { if (it.type==='run' && !it.existing && !(it.len>0)) r++; if (it.type==='ds') { const miss=[]; if(!it.size) miss.push('size'); if(!it.story) miss.push('story'); if(it.status!=='reuse' && (!it.seq || !it.seq.length)) miss.push('elbow sequence'); if(!it.term) miss.push('termination'); if (miss.length) d++; } }
   if (r) probs.push(`${r} gutter run${r>1?'s':''} with no length (shown in red)`);
   if (d) probs.push(`${d} downspout${d>1?'s':''} missing size / story / elbows / termination (shown in red)`);
   if (!job.items.some(i=>i.type==='run' && !i.existing)) probs.push('No new gutter runs on the drawing');
@@ -1060,10 +1063,11 @@ function computeMaterials(gFilter, rs){ // gFilter: 'all' or group index; rs = r
   rs = rs || resolveEnds();
   const inG = it => gFilter==='all' || (it.g||0)===+gFilter;
   const items = job.items.filter(i => inG(i) && !(i.type==='run' && i.existing));
-  const m = {gutter:{}, coverLF:0, endcaps:0, miterIn:0, miterOut:0, miterBay:0, ds:0, dsBySize:{}, dsByStory:{}, elbA:0, elbB:0, offsets:{'2"':0,'4"':0,'6"':0}, outlets:0, straps:0, acc:{splashguard:0,splashblock:0,offset:0,dripedge:0,rainchain:0}, rainchainTerm:0};
+  const m = {gutter:{}, coverLF:0, endcaps:0, miterIn:0, miterOut:0, miterBay:0, ds:0, dsReuse:0, dsBySize:{}, dsByStory:{}, elbA:0, elbB:0, offsets:{'2"':0,'4"':0,'6"':0}, outlets:0, straps:0, acc:{splashguard:0,splashblock:0,offset:0,dripedge:0,rainchain:0}, rainchainTerm:0};
   for (const it of items) {
     if (it.type==='run') { const L = +it.len||0; m.gutter[it.profile||'?'] = (m.gutter[it.profile||'?']||0) + L; if (it.cover) m.coverLF += L;
       const e = rs.ends.get(it.id) || {l:'endcap', r:'endcap'}; if (e.l==='endcap') m.endcaps++; if (e.r==='endcap') m.endcaps++; }
+    else if (it.type==='ds' && it.status==='reuse') { m.dsReuse++; }
     else if (it.type==='ds') { m.ds++; m.dsBySize[it.size||'?'] = (m.dsBySize[it.size||'?']||0)+1; const st = it.story||1; m.dsByStory[st] = (m.dsByStory[st]||0)+1;
       for (const t of (it.seq||[])) { if (t==='A') m.elbA++; else if (t==='B') m.elbB++; else if (m.offsets[t]!==undefined) m.offsets[t]++; }
       m.straps += STRAPS[st] || 2; if (it.term==='rainchain') m.rainchainTerm++; }
@@ -1092,7 +1096,8 @@ function renderMaterials(){
   html += row('Gutter covers', fmtLF(m.coverLF), mm => mm.coverLF ? fmtLF(mm.coverLF) : '');
   html += row('End caps', m.endcaps, mm => mm.endcaps||'');
   html += row('Miters — inside', m.miterIn, mm => mm.miterIn||'') + row('Miters — outside', m.miterOut, mm => mm.miterOut||'') + row('Miters — bay', m.miterBay, mm => mm.miterBay||'');
-  html += row('Downspouts', m.ds, mm => mm.ds||'');
+  html += row('Downspouts (new)', m.ds, mm => mm.ds||'');
+  if (m.dsReuse) html += `<tr class="sub"><td>&nbsp;&nbsp;existing — reuse (not counted)</td><td>${m.dsReuse}</td></tr>`;
   for (const s of Object.keys(m.dsBySize)) html += `<tr class="sub"><td>&nbsp;&nbsp;${esc(s)}</td><td>${m.dsBySize[s]}</td></tr>`;
   for (const st of storyKeys(m.dsByStory)) html += `<tr class="sub"><td>&nbsp;&nbsp;${esc(storyName(st==='LR'?'LR':+st))}</td><td>${m.dsByStory[st]}</td></tr>`;
   html += row('Elbows A', m.elbA, mm => mm.elbA||'') + row('Elbows B', m.elbB, mm => mm.elbB||'');
@@ -1172,7 +1177,7 @@ function exportPDF(){
   doc.setFont('helvetica','normal'); doc.setFontSize(8);
   doc.text('END MARKS:  cross tick = end cap   |   filled dot = inside miter   |   open dot = outside miter   |   open square = bay miter   |   dashed tail = continues', M, ly); ly += 11;
   doc.text('DOWNSPOUT label = elbows/offsets top to bottom + story (e.g. "AA 2\" 2\" B 2st").  Dashed line beside a run = gutter cover.', M, ly); ly += 11;
-  doc.text('Grey dashed run = EXISTING gutter, not in scope and not counted.  Red-orange circles = hazards / attention (not counted).', M, ly); ly += 11;
+  doc.text('Grey dashed run = EXISTING gutter, not counted.  Hollow slashed square = existing downspout to REUSE (not counted).  Red-orange circles = hazards / attention (not counted).', M, ly); ly += 11;
   doc.setFont('helvetica','bold'); doc.text('Schematic — NOT TO SCALE. Lengths are field measurements in feet.', M, ly);
   // ---- page 2: material list
   doc.addPage(); header('MATERIAL LIST'); info(78); let y = 118;
@@ -1184,7 +1189,7 @@ function exportPDF(){
     doc.setFillColor(...navy); doc.rect(M, y-10, 268, 16, 'F'); doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.text(title + '   (from drawing)', M+6, y+1); y += 18;
     const profs = Object.keys(m.gutter); if (profs.length) profs.forEach(pr => line(`Gutter ${pr}`, fmtLF(m.gutter[pr]))); else line('Gutter','—');
     line('Gutter covers', fmtLF(m.coverLF)); line('End caps', m.endcaps); line('Miters — inside', m.miterIn); line('Miters — outside', m.miterOut); line('Miters — bay', m.miterBay);
-    line('Downspouts', m.ds); Object.keys(m.dsBySize).forEach(s => line(s, m.dsBySize[s], true)); storyKeys(m.dsByStory).forEach(st => line(storyName(st==='LR'?'LR':+st), m.dsByStory[st], true));
+    line('Downspouts (new)', m.ds); if (m.dsReuse) line('existing — reuse (not counted)', m.dsReuse, true); Object.keys(m.dsBySize).forEach(s => line(s, m.dsBySize[s], true)); storyKeys(m.dsByStory).forEach(st => line(storyName(st==='LR'?'LR':+st), m.dsByStory[st], true));
     line('Elbows A', m.elbA); line('Elbows B', m.elbB); OFFSET_SIZES.forEach(sz => line(`Offsets ${sz}`, m.offsets[sz])); line('Outlets', m.outlets);
     const ovr = job.manual.straps[key]; line('Pipe bands' + (ovr!==undefined?` (override; auto ${m.straps})`:''), ovr!==undefined?ovr:m.straps);
     line('Splash guards', m.acc.splashguard); line('Splash blocks', m.acc.splashblock); line('Rain chains', m.acc.rainchain+m.rainchainTerm); line('Drip edge extensions', m.acc.dripedge);

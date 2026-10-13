@@ -30,7 +30,7 @@ Keep it that way. No customer data, exports, credentials or other files belong i
 
 ## Version history
 
-- **v2.1** (2026-10-13) — "Lower roof" moved from termination to the story list (label `LR`, 2 pipe bands); **Multi** button next to Select for multi-select (group reassignment, group move, delete all); splash guard drawn as a star; story labels (1–3 st) in the palette to drop on sections of the house.
+- **v2.1** (2026-10-13) — "Lower roof" moved from termination to the story list (label `LR`, 2 pipe bands); **Multi** button next to Select for multi-select (group reassignment, group move, delete all); splash guard drawn as a star; story labels (1–3 st) in the palette to drop on sections of the house; downspouts can be marked **REUSE EXISTING** (hollow slashed square, not counted).
 
 - **v2** (2026-10-13) — auto-miters at corners (tap a corner to flip inside/outside/bay), length-only run labels, existing-gutter dashed runs, downspout stories 1–3 in half steps, elbow row with 2"/4"/6" offsets counted in the material list, pipe bands 2/3/3/4/4 by story, callout presets (Tie-in).
 - **v1** (2026-10-12) — first build: Field Mode / Full Mode, options 1–5, material list, PDF/PNG export, job list, photos with pins, imported backgrounds.
