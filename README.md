@@ -31,6 +31,8 @@ Keep it that way. No customer data, exports, credentials or other files belong i
 
 ## Version history
 
+- **v2.9.1** (2026-10-13) — the grey "existing" word is gone from dashed runs; they show only a length if one was entered.
+
 - **v2.9** (2026-10-13) — any run can be switched between **NEW gutter** and **EXISTING (dashed)** after the fact, in the run panel or via Multi for a batch; length, covers, group and drip-edge settings carry over, and the gutter LF / end caps / hangers update accordingly (covers on an existing run still count).
 
 - **v2.8** (2026-10-13) — tie-in corners: a new run that meets an **existing** (dashed) run at a corner now counts as a miter (inside/outside by turn direction, "incl. tie-in to existing gutter (strip miter)" sub-line) instead of an end cap; highlight tags read "OUT · TIE".

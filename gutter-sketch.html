@@ -511,7 +511,7 @@ function termLabel(code){ return (TERMS.find(e=>e[0]===code)||[code,code])[1]; }
 function seqText(seq){ if (!Array.isArray(seq)) return String(seq||''); let s=''; let prevLetter=false; for (const t of seq) { const letter = t==='A'||t==='B'; s += (s && !(letter && prevLetter)) ? ' '+t : t; prevLetter = letter; } return s; }
 function dominantProfile(){ const lf={}; for (const it of job.items) if (it.type==='run' && !it.existing) lf[it.profile||'?'] = (lf[it.profile||'?']||0) + (+it.len||0); let best=null, bv=-1; for (const k in lf) if (lf[k]>bv) { bv=lf[k]; best=k; } return best; }
 function runLabel(r, dom){
-  if (r.existing) return (r.len>0 ? `${r.len}'  ` : '') + 'existing';
+  if (r.existing) return r.len>0 ? `${r.len}'` : '';
   let s = `${r.len||'?'}'`; if (r.profile && r.profile!==dom) s += `  ${r.profile}`; if (r.story===2) s += '  2st'; return s;
 }
 const CK = (x,y) => `${Math.round(x)},${Math.round(y)}`;
@@ -606,7 +606,7 @@ function drawRun(p, r, o){
     p.line(r.x1,r.y1,r.x2,r.y2,{color:col, width: field?4:3, dash:[10,8]});
     if (r.cover) p.line(r.x1+px*7, r.y1+py*7, r.x2+px*7, r.y2+py*7, {color:ccol, width:2.5, dash:[6,4]});
     if (r.de) p.line(r.x1-px*6, r.y1-py*6, r.x2-px*6, r.y2-py*6, {color:ccol, width:1.5});
-    { const lbl = runLabel(r), lsz = field?13:11, LX = mx + px*(r.cover?19:12)*sgn, LY = my + py*(r.cover?19:12)*sgn, horiz = Math.abs(Math.cos(ang)) > 0.7, tw = textW(lbl, lsz), th = lsz*1.35;
+    if (runLabel(r)) { const lbl = runLabel(r), lsz = field?13:11, LX = mx + px*(r.cover?19:12)*sgn, LY = my + py*(r.cover?19:12)*sgn, horiz = Math.abs(Math.cos(ang)) > 0.7, tw = textW(lbl, lsz), th = lsz*1.35;
       (o.placed ||= []).push(horiz ? {x:LX-tw/2, y:LY-th/2, w:tw, h:th} : {x:LX-th/2, y:LY-tw/2, w:th, h:tw});
       p.text(lbl, LX, LY, {size: lsz, bold:!!r.cover, color: r.cover?ccol:col, bg:'#fff', angle:ang}); }
     if (r.g) badge(p, mx - px*12*sgn, my - py*12*sgn, r.g, 6.5);
