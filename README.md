@@ -31,6 +31,8 @@ Keep it that way. No customer data, exports, credentials or other files belong i
 
 ## Version history
 
+- **v3.4** (2026-10-14) — **Draw first, measure later**: in Field Mode a run no longer opens the number pad; draw the whole layout, then tap **LENGTHS** and tap each run to enter its footage (runs without a length stay red; Finish in Truck reminds you how many are left; export still requires every new run to have a length). In Full Mode the pad gets a **MEASURE LATER** button. **Every material-list count can be typed over** (gutter and cover footage, end caps left/right, miters, downspout pieces, elbows, offsets, round elbows/offsets, drop outlets, outlets, splash guards, splash blocks, rain chains — on top of the existing pipe band / hanger / Geocel / rain-chain-kit boxes); the grey number is the auto count, a typed number replaces it per tab, clearing the box goes back to auto, and edited lines print "(edited; auto N)" on the materials PDF. **Chimney** marker added to Hazards / Attention.
+
 - **v3.3.1** (2026-10-14) — **Repair-only jobs export**: removed the "No new gutter runs on the drawing" block, so a job with only existing gutter, downspouts, accessories or callouts can export; an empty drawing is still blocked.
 
 - **v3.3** (2026-10-14) — **Text callouts**: new "To lower roof" preset (alongside Tie-in / Tear out / Reuse existing DS); the note box is now 4 rows tall for typing or writing with the Pencil (up to 200 characters, line breaks kept and stacked on the drawing). Smooth square offsets confirmed not counted (custom-cut, same as v3.2).
