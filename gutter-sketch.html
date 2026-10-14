@@ -395,7 +395,7 @@ function newJob(){
   return { id: uid(), customer:'', address:'', date: todayISO(), quote:'', prep: localStorage.getItem('gs_prep') || '',
     items: [], photos: [], photoSeq: 0,
     bg: {type:'grid', rot:0, imgId:null, w:0, h:0},
-    manual: {gutterColor:'', gutterCustom:'', dsColor:'', dsCustom:'', wedges:'none', coverType:'', hangerOv:{}, rcKitOv:{}, flexPipes:'', geocel:'', screws:'', poDelivery:'', fascia:'', soffit:'', jchannel:'', collectorBox:'', misc:'', notes:'', straps:{}}, corners:{}, v:4,
+    manual: {gutterColor:'', gutterCustom:'', dsColor:'', dsCustom:'', wedges:'none', coverType:'', hangerOv:{}, rcKitOv:{}, geocelOv:{}, flexPipes:'', geocel:'', screws:'', poDelivery:'', fascia:'', soffit:'', jchannel:'', collectorBox:'', misc:'', notes:'', straps:{}}, corners:{}, v:4,
     defaults: {profile:'6" K', cover:false, story:1, lend:'auto', rend:'auto', dsSize:'3×4"', dsStory:1, dsTerm:'splashblock', group:0},
     view: {tx:80, ty:140, s:1}, mode:'field', created: Date.now(), updated: Date.now() };
 }
@@ -419,7 +419,7 @@ function openJob(id){
   if (job.v < 3) { // v2 -> v3: Jobber-aligned profile/size names, wedges replace hanger type, zip screws gone
     for (const it of job.items) { if (it.type==='run' && PROFILE_MAP[it.profile]) it.profile = PROFILE_MAP[it.profile]; if (it.type==='ds' && DS_SIZE_MAP[it.size]) it.size = DS_SIZE_MAP[it.size]; }
     if (PROFILE_MAP[job.defaults.profile]) job.defaults.profile = PROFILE_MAP[job.defaults.profile]; if (DS_SIZE_MAP[job.defaults.dsSize]) job.defaults.dsSize = DS_SIZE_MAP[job.defaults.dsSize];
-    const mn = job.manual; mn.wedges ||= 'none'; mn.hangerOv ||= {}; mn.gutterCustom ||= ''; mn.dsCustom ||= ''; delete mn.hangerType; delete mn.hangerQty; delete mn.zipScrews; delete mn.sprayPaint; delete mn.offsets;
+    const mn = job.manual; mn.wedges ||= 'none'; mn.hangerOv ||= {}; mn.geocelOv ||= {}; if (mn.geocel!=='' && mn.geocel!=null && mn.geocelOv.all===undefined) { mn.geocelOv.all = +mn.geocel; } mn.geocel = ''; mn.gutterCustom ||= ''; mn.dsCustom ||= ''; delete mn.hangerType; delete mn.hangerQty; delete mn.zipScrews; delete mn.sprayPaint; delete mn.offsets;
     if (mn.gutterColor && !COLORS.includes(mn.gutterColor)) { mn.gutterCustom = mn.gutterColor; mn.gutterColor = 'custom'; } if (mn.dsColor && !COLORS.includes(mn.dsColor)) { mn.dsCustom = mn.dsColor; mn.dsColor = 'custom'; }
     job.v = 3;
   }
@@ -1219,7 +1219,7 @@ function computeMaterials(gFilter, rs){ // gFilter: 'all' or group index; rs = r
   rs = rs || resolveEnds();
   const inG = it => gFilter==='all' || (it.g||0)===+gFilter;
   const items = job.items.filter(i => inG(i) && !(i.type==='run' && i.existing));
-  const m = {gutter:{}, coverLF:0, sgLF:0, newLF:0, hangers:0, endcaps:0, endcapL:0, endcapR:0, miterIn:0, miterOut:0, miterBay:0, miterBayIn:0, miterBayOut:0, ds:0, dsReuse:0, dsBySize:{}, dsByStory:{}, elbA:0, elbB:0, offsets:{'2"':0,'4"':0,'6"':0}, outlets:0, straps:0, acc:{splashguard:0,splashblock:0,dropoutlet:0,offset:0,dripedge:0,rainchain:0}, rainchainTerm:0, sbTerm:0, dsPieces:0, dsPiecesBySize:{}};
+  const m = {gutter:{}, coverLF:0, sgLF:0, newLF:0, hangers:0, endcaps:0, endcapL:0, endcapR:0, miterIn:0, miterOut:0, miterBay:0, miterBayIn:0, miterBayOut:0, ds:0, dsReuse:0, dsBySize:{}, dsByStory:{}, elbA:0, elbB:0, offsets:{'2"':0,'4"':0,'6"':0}, outlets:0, straps:0, acc:{splashguard:0,splashblock:0,dropoutlet:0,offset:0,dripedge:0,rainchain:0}, rainchainTerm:0, sbTerm:0, dsPieces:0, dsPiecesBySize:{}, elbRound:0, offRound:{'2"':0,'4"':0,'6"':0}};
   for (const it of items) {
     if (it.type==='run') { const L = +it.len||0; m.gutter[it.profile||'?'] = (m.gutter[it.profile||'?']||0) + L; m.newLF += L; if (it.cover) m.coverLF += L;
       const e = rs.ends.get(it.id) || {l:'endcap', r:'endcap'}; const le = rs.side ? leftEnd(it, rs.side) : 1;
@@ -1227,7 +1227,8 @@ function computeMaterials(gFilter, rs){ // gFilter: 'all' or group index; rs = r
     else if (it.type==='ds' && it.status==='reuse') { m.dsReuse++; }
     else if (it.type==='ds') { m.ds++; m.dsBySize[it.size||'?'] = (m.dsBySize[it.size||'?']||0)+1; const st = it.story||1; m.dsByStory[st] = (m.dsByStory[st]||0)+1;
       const pc = dsPieces(st); m.dsPieces += pc; m.dsPiecesBySize[it.size||'?'] = (m.dsPiecesBySize[it.size||'?']||0) + pc;
-      for (const t of (it.seq||[])) { if (t==='A') m.elbA++; else if (t==='B') m.elbB++; else if (m.offsets[t]!==undefined) m.offsets[t]++; }
+      if (it.size==='4" Round') { for (const t of (it.seq||[])) { if (t==='A'||t==='B') m.elbRound++; else if (m.offRound[t]!==undefined) m.offRound[t]++; } }   // round: one elbow part; A/B only tells the crew placement
+      else if (it.size!=='Smooth Square') { for (const t of (it.seq||[])) { if (t==='A') m.elbA++; else if (t==='B') m.elbB++; else if (m.offsets[t]!==undefined) m.offsets[t]++; } }   // smooth square: elbows/offsets custom-cut from downspout stock, not counted
       m.straps += STRAPS[st] || 2; if (it.term==='rainchain') m.rainchainTerm++; if (it.term==='splashblock') m.sbTerm++; }
     else if (it.type==='acc') m.acc[it.sub]++;
   }
@@ -1240,7 +1241,10 @@ function computeMaterials(gFilter, rs){ // gFilter: 'all' or group index; rs = r
   // miters are counted per corner (a shared endpoint), not per run end
   m.tieIn = 0; for (const c of rs.corners) { if (gFilter!=='all' && !c.groups.includes(+gFilter)) continue; if (c.kind==='miter_in') m.miterIn++; else if (c.kind==='miter_out') m.miterOut++; else if (c.kind==='miter_bay_in') m.miterBayIn++; else if (c.kind==='miter_bay_out') m.miterBayOut++; if (c.tiein && c.kind!=='seam') m.tieIn++; }
   m.miterBay = m.miterBayIn + m.miterBayOut; m.rainchains = (m.acc.rainchain||0) + (m.rainchainTerm||0); m.rcKits = m.rainchains; m.splashblocks = (m.acc.splashblock||0) + (m.sbTerm||0);   // one install kit per rain chain
-  m.outlets = m.ds + m.dropOutlets; return m;
+  m.outlets = m.ds + m.dropOutlets;
+  m.miters = m.miterIn + m.miterOut + m.miterBayIn + m.miterBayOut;   // Geocel: 1 tube per 3 miters; end caps only matter on a job with no miters (1 tube per 20)
+  m.geocel = m.miters ? Math.ceil(m.miters/3) : ((m.newLF>0 || m.endcaps>0) ? Math.max(1, Math.ceil(m.endcaps/20)) : 0);
+  return m;
 }
 const colorName = (c, custom) => c==='custom' ? (custom || 'custom') : (c || '—');
 const storyKeys = o => Object.keys(o).sort((a,b) => (a==='LR') - (b==='LR') || a - b);
@@ -1272,9 +1276,11 @@ function renderMaterials(){
   if (m.dsReuse) html += `<tr class="sub"><td>&nbsp;&nbsp;existing — reuse (not counted)</td><td>${m.dsReuse}</td></tr>`;
   html += row('Elbows A', m.elbA, mm => mm.elbA||'') + row('Elbows B', m.elbB, mm => mm.elbB||'');
   for (const sz of OFFSET_SIZES) html += row(`Offsets ${sz}`, m.offsets[sz], mm => mm.offsets[sz]||'');
+  if (m.elbRound || OFFSET_SIZES.some(sz => m.offRound[sz])) { html += row('Round elbows (4")', m.elbRound, mm => mm.elbRound||''); for (const sz of OFFSET_SIZES) html += row(`Round offsets ${sz}`, m.offRound[sz], mm => mm.offRound[sz]||''); }
   html += row('Drop outlets', m.dropOutlets, mm => mm.dropOutlets||'') + row('Outlets (DS + drop)', m.outlets, mm => mm.outlets||'');
   html += `<tr><td>Pipe bands <span style="font-size:11px;color:#555">(auto ${m.straps})</span></td><td><input type="number" inputmode="numeric" id="strapOv" placeholder="${m.straps}" value="${ov??''}"></td></tr>`;
   const hov = job.manual.hangerOv[strapKey]; html += `<tr><td>Hangers <span style="font-size:11px;color:#555">(auto ${m.hangers} = ${fmtLF(m.newLF)} ÷ 2)</span></td><td><input type="number" inputmode="numeric" id="hangerOv" placeholder="${m.hangers}" value="${hov??''}"></td></tr>`;
+  const gov = job.manual.geocelOv[strapKey]; html += `<tr><td>Geocel (tubes) <span style="font-size:11px;color:#555">(auto ${m.geocel} = ${m.miters ? `${m.miters} miter${m.miters>1?'s':''} ÷ 3` : `no miters, ${m.endcaps} end cap${m.endcaps===1?'':'s'} ÷ 20`})</span></td><td><input type="number" inputmode="numeric" id="geocelOv" placeholder="${m.geocel}" value="${gov??''}"></td></tr>`;
   html += row('Touch-up spray paint', m.paint ? `1 can — ${esc(colorName(job.manual.gutterColor, job.manual.gutterCustom))}` : '0');
   html += row('Splash guards', m.acc.splashguard, mm => mm.acc.splashguard||'') + row('Splash blocks', m.splashblocks, mm => mm.splashblocks||'') + row('Rain chains', m.rainchains, mm => mm.rainchains||'');
   const rov = job.manual.rcKitOv[strapKey]; html += `<tr><td>Rain chain install kits <span style="font-size:11px;color:#555">(auto ${m.rcKits} = 1 per chain)</span></td><td><input type="number" inputmode="numeric" id="rcKitOv" placeholder="${m.rcKits}" value="${rov??''}"></td></tr>`;
@@ -1285,6 +1291,7 @@ function renderMaterials(){
   $('#strapOv').addEventListener('change', e => { const v = e.target.value.trim(); if (v==='') delete job.manual.straps[strapKey]; else job.manual.straps[strapKey] = +v; touch(); });
   $('#rcKitOv').addEventListener('change', e => { const v = e.target.value.trim(); if (v==='') delete job.manual.rcKitOv[strapKey]; else job.manual.rcKitOv[strapKey] = +v; touch(); });
   $('#hangerOv').addEventListener('change', e => { const v = e.target.value.trim(); if (v==='') delete job.manual.hangerOv[strapKey]; else job.manual.hangerOv[strapKey] = +v; touch(); });
+  $('#geocelOv').addEventListener('change', e => { const v = e.target.value.trim(); if (v==='') delete job.manual.geocelOv[strapKey]; else job.manual.geocelOv[strapKey] = +v; touch(); });
   const mn = job.manual;
   const colorSel = (key, val) => `<select data-m="${key}"><option value="">— select —</option>${COLORS.map(c=>`<option value="${esc(c)}" ${val===c?'selected':''}>${esc(c)}</option>`).join('')}</select>`;
   $('#mManual').innerHTML = `<h4>Manual <span class="tag">saved with sketch</span></h4><div class="mfields">
@@ -1295,7 +1302,6 @@ function renderMaterials(){
     <label>Gutter cover type<select data-m="coverType"><option value="">— select —</option>${COVER_TYPES.map(c=>`<option value="${esc(c)}" ${mn.coverType===c?'selected':''}>${esc(c)}</option>`).join('')}</select></label>
     <label>Wedges<select data-m="wedges">${WEDGES.map(([v,l])=>`<option value="${v}" ${(mn.wedges||'none')===v?'selected':''}>${l}</option>`).join('')}</select></label>
     <label>Flex pipes<input type="number" inputmode="numeric" data-m="flexPipes" value="${esc(mn.flexPipes)}"></label>
-    <label>Geocel (tubes)<input type="number" inputmode="numeric" data-m="geocel" value="${esc(mn.geocel)}"></label>
     <label>Screws<input type="number" inputmode="numeric" data-m="screws" value="${esc(mn.screws)}"></label>
     <h4 class="full" style="margin:6px 0 0">Special order <span class="tag">size / color / amount</span></h4>
     ${MANUAL_TEXT.map(([k,l]) => `<label>${l}<input data-m="${k}" value="${esc(mn[k]||'')}" placeholder="e.g. 24' 1×6 white"></label>`).join('')}
@@ -1435,9 +1441,10 @@ function pdfMaterialsPages(doc){
     if (m.sgLF) line(`incl. ${SPLASH_GUARD_LF}' x ${m.acc.splashguard} splash guards`, fmtLF(m.sgLF), true);
     line('Gutter covers' + (job.manual.coverType ? ` — ${job.manual.coverType}` : ''), fmtLF(m.coverLF)); line('End caps', m.endcaps); line('left', m.endcapL, true); line('right', m.endcapR, true); line('Miters — inside', m.miterIn); line('Miters — outside', m.miterOut); line('Bay miters — outside', m.miterBayOut); line('Bay miters — inside', m.miterBayIn); if (m.tieIn) line('incl. tie-in to existing gutter (strip miter)', m.tieIn, true);
     line('Downspouts (new) — pieces', m.dsPieces); Object.keys(m.dsPiecesBySize).forEach(s => line(s + ' pieces', m.dsPiecesBySize[s], true)); if (m.ds) line('drops (one per downspout location)', m.ds, true); storyKeys(m.dsByStory).forEach(st => line(storyName(st==='LR'?'LR':+st) + ' drops', m.dsByStory[st], true)); if (m.dsReuse) line('existing — reuse (not counted)', m.dsReuse, true);
-    line('Elbows A', m.elbA); line('Elbows B', m.elbB); OFFSET_SIZES.forEach(sz => line(`Offsets ${sz}`, m.offsets[sz])); line('Drop outlets', m.dropOutlets); line('Outlets (DS + drop)', m.outlets);
+    line('Elbows A', m.elbA); line('Elbows B', m.elbB); OFFSET_SIZES.forEach(sz => line(`Offsets ${sz}`, m.offsets[sz])); if (m.elbRound || OFFSET_SIZES.some(sz => m.offRound[sz])) { line('Round elbows (4")', m.elbRound); OFFSET_SIZES.forEach(sz => line(`Round offsets ${sz}`, m.offRound[sz])); } line('Drop outlets', m.dropOutlets); line('Outlets (DS + drop)', m.outlets);
     const ovr = job.manual.straps[key]; line('Pipe bands' + (ovr!==undefined?` (override; auto ${m.straps})`:''), ovr!==undefined?ovr:m.straps);
     const hov = job.manual.hangerOv[key]; line('Hangers' + (hov!==undefined?` (override; auto ${m.hangers})`:` (${fmtLF(m.newLF)} / 2)`), hov!==undefined?hov:m.hangers);
+    const gov = job.manual.geocelOv[key]; line('Geocel (tubes)' + (gov!==undefined?` (override; auto ${m.geocel})`:(m.miters?` (${m.miters} miters / 3)`:' (no miters)')), gov!==undefined?gov:m.geocel);
     line('Touch-up spray paint', m.paint ? `1 can - ${colorName(job.manual.gutterColor, job.manual.gutterCustom)}` : 0);
     line('Splash guards', m.acc.splashguard); line('Splash blocks', m.splashblocks); line('Rain chains', m.rainchains);
     const rov = job.manual.rcKitOv[key]; line('Rain chain install kits' + (rov!==undefined?` (override; auto ${m.rcKits})`:''), rov!==undefined?rov:m.rcKits); line('Drip edge extension', m.de ? 'Yes' : 'No');
@@ -1447,7 +1454,7 @@ function pdfMaterialsPages(doc){
   doc.setPage(1); let my = FRAME.bodyTop + 6; const mn = job.manual;
   doc.setFillColor(...gold); doc.rect(colR, my-10, PW-M-colR, 16, 'F'); doc.setTextColor(...navy); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.text('JOB DETAILS', colR+6, my+1); my += 18;
   const mline = (l,v) => { doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(...navy); doc.text(l, colR+6, my); doc.setFont('helvetica','bold'); const vs = String(v||'—'); const lw = doc.getTextWidth(l), room = (PW-M-4) - (colR+6+lw) - 8; let fs = 10; while (fs > 6.5 && doc.getTextWidth(vs) > room) { fs -= 0.5; doc.setFontSize(fs); } doc.text(vs, PW-M-4, my, {align:'right'}); doc.setDrawColor(225); doc.line(colR, my+4, PW-M, my+4); my += 15; };
-  mline('Gutter color', colorName(mn.gutterColor, mn.gutterCustom)); mline('Downspout color', colorName(mn.dsColor, mn.dsCustom)); mline('Gutter cover type', mn.coverType); mline('Wedges', (WEDGES.find(w=>w[0]===(mn.wedges||'none'))||WEDGES[0])[1]); mline('Flex pipes', mn.flexPipes); mline('Geocel (tubes)', mn.geocel); mline('Screws', mn.screws);
+  mline('Gutter color', colorName(mn.gutterColor, mn.gutterCustom)); mline('Downspout color', colorName(mn.dsColor, mn.dsCustom)); mline('Gutter cover type', mn.coverType); mline('Wedges', (WEDGES.find(w=>w[0]===(mn.wedges||'none'))||WEDGES[0])[1]); mline('Flex pipes', mn.flexPipes); mline('Screws', mn.screws);
   my += 8; doc.setFillColor(...gold); doc.rect(colR, my-10, PW-M-colR, 16, 'F'); doc.setTextColor(...navy); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.text('SPECIAL ORDER', colR+6, my+1); my += 18;
   MANUAL_TEXT.forEach(([k,l]) => mline(l, mn[k]));
   my += 8; doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.text('ADDITIONAL NOTES', colR+6, my); my += 13; doc.setFont('helvetica','normal'); doc.setFontSize(9.5); const noteLines = doc.splitTextToSize(mn.notes||'—', PW-M-colR-10); doc.text(noteLines, colR+6, my);
