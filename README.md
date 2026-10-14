@@ -31,6 +31,8 @@ Keep it that way. No customer data, exports, credentials or other files belong i
 
 ## Version history
 
+- **v2.6** (2026-10-13) — exports split and restyled in the print-friendly "A-Light" brand frame (full logo, faint sunburst, navy/gold rules, cream info strip, "Call 904-384-3423 · SergeantSeamless.com" footer). One **Export** button offers: **Drawing — PNG** (attach to the Jobber quote), **Drawing — PDF** (crew print), **Materials + photos — PDF** (internal note, not for the customer). Files are named `Last_Number_Date_drawing.png / _drawing.pdf / _materials.pdf`.
+
 - **v2.5** (2026-10-13) — downspout labels avoid collisions: each label tries eight positions around its square and takes the one clearest of gutter lines and other labels (thin dashed leader when it has to sit farther away); in Select mode a selected downspout shows a gold dot on its label — drag it to place the label by hand ("Auto-place label" in the panel undoes that).
 
 - **v2.4** (2026-10-13) — branded exports per the KickCharge brand guide: navy header band with gold/orange rule, Sergeant Seamless badge top-left, cream customer strip, mascot beside the legend, navy footer with address / email / phone / web on every page, section bars in navy + gold; PNG export carries the badge; home-screen icon is now the badge (`icon-180.png`).
