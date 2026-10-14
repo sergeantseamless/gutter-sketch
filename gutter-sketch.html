@@ -517,8 +517,8 @@ function runLabel(r, dom){
 const CK = (x,y) => `${Math.round(x)},${Math.round(y)}`;
 // Resolve 'auto' run ends: a shared endpoint is a miter (inside/outside from the house shape), a loose end is an end cap.
 function resolveEnds(){
-  const runs = job.items.filter(i => i.type==='run' && !i.existing);
-  const res = new Map(); runs.forEach(r => res.set(r.id, {l: (!r.lend||r.lend==='auto') ? 'endcap' : r.lend, r: (!r.rend||r.rend==='auto') ? 'endcap' : r.rend}));
+  const runs = job.items.filter(i => i.type==='run');   // existing runs take part in corner detection (tie-ins) but get no end marks
+  const res = new Map(); runs.forEach(r => res.set(r.id, r.existing ? {l:'none', r:'none'} : {l: (!r.lend||r.lend==='auto') ? 'endcap' : r.lend, r: (!r.rend||r.rend==='auto') ? 'endcap' : r.rend}));
   // 1. cluster run endpoints into nodes (shared endpoint = corner)
   const nodes = []; const nodeOf = new Map();   // "runId:1|2" -> node
   const findNode = (x,y) => nodes.find(n => dist(n.x,n.y,x,y) < 3);
@@ -546,6 +546,8 @@ function resolveEnds(){
   // 3. classify each 2-way node
   const corners = [];
   for (const n of nodes) { if (n.ends.length < 2) continue;
+    const newEnds = n.ends.filter(q => !q.r.existing); if (!newEnds.length) continue;           // existing-to-existing joint: nothing to count
+    const tiein = newEnds.length < n.ends.length;
     const key = CK(n.x,n.y); let kind = job.corners[key] || null; const auto = !kind;
     if (!kind) {
       const [a,b2] = n.ends; const ra=a.r, rb=b2.r;
@@ -559,8 +561,8 @@ function resolveEnds(){
       const L = Math.hypot(ax,ay)*Math.hypot(bx,by) || 1;
       if (Math.abs(cross)/L < 0.2) kind = 'seam'; else kind = (cross*s*side > 0) ? 'miter_out' : 'miter_in';
     }
-    corners.push({key, x:n.x, y:n.y, kind, auto, groups:[...new Set(n.ends.map(q => q.r.g||0))]});
-    for (const q of n.ends) { const rec = res.get(q.r.id); const manual = q.e===1 ? q.r.lend : q.r.rend; if (!manual || manual==='auto') { if (q.e===1) rec.l = kind; else rec.r = kind; } }
+    corners.push({key, x:n.x, y:n.y, kind, auto, tiein, groups:[...new Set(newEnds.map(q => q.r.g||0))]});
+    for (const q of newEnds) { const rec = res.get(q.r.id); const manual = q.e===1 ? q.r.lend : q.r.rend; if (!manual || manual==='auto') { if (q.e===1) rec.l = kind; else rec.r = kind; } }
   }
   return {ends: res, corners};
 }
@@ -590,7 +592,7 @@ function drawEndMark(p, x, y, ux, uy, kind, col, w){
   else if (kind==='miter_bay') p.text('BAY', x - ux*0 + (-uy)*0, y - 14, {size:8, bold:true, color:'#fff', bg:col});
   // inside / outside miters draw nothing — the corner itself shows which it is (they are still counted)
   else if (kind==='continues') { p.line(x+ux*2, y+uy*2, x-ux*10, y-uy*10, {color:col, width:w*0.6, dash:[4,4]}); }
-  // 'seam' (straight joint) and 'auto' draw nothing
+  // 'seam' (straight joint), 'none' (existing run) and 'auto' draw nothing
 }
 function badge(p, x, y, g, size=8){ if(!g) return; p.circle(x, y, size, {fill:GROUPS[g].c, color:NAVY, width:1.5}); p.text(String(g), x, y, {size:size*1.2, bold:true, color: g===1?NAVY:'#fff'}); }
 
@@ -714,7 +716,7 @@ function render(){
   drawScene(p, o);
   if (!o.field && (tool==='select' || cornerHL)) for (const c of rs.corners) { if (c.kind==='seam') continue; const hit = cornerHL && (cornerHL==='all' || cornerHL===c.kind);
     p.circle(c.x, c.y, hit?14:11, {color: hit ? RED : (c.auto ? 'rgba(0,23,56,0.25)' : GOLD), width: hit?3:2});
-    if (cornerHL) p.text(c.kind==='miter_in'?'IN':c.kind==='miter_out'?'OUT':'BAY', c.x, c.y-22, {size:10, bold:true, color:'#fff', bg: hit?RED:NAVY}); }
+    if (cornerHL) p.text((c.kind==='miter_in'?'IN':c.kind==='miter_out'?'OUT':'BAY') + (c.tiein?' · TIE':''), c.x, c.y-22, {size:10, bold:true, color:'#fff', bg: hit?RED:NAVY}); }
   drawPins(p, o);
   // previews
   if (runPreview) { p.line(runPreview.x1,runPreview.y1,runPreview.x2,runPreview.y2,{color:'#888',width:4,dash:[8,6]}); const L = Math.hypot(runPreview.x2-runPreview.x1, runPreview.y2-runPreview.y1); }
@@ -1189,7 +1191,7 @@ function computeMaterials(gFilter, rs){ // gFilter: 'all' or group index; rs = r
   m.de = job.items.some(i => inG(i) && i.type==='run' && i.de) || m.acc.dripedge > 0;
   const gc = job.manual.gutterColor; m.paint = (gc && !NO_PAINT_COLORS.includes(gc) && job.manual.wedges && job.manual.wedges!=='none') ? 1 : 0;
   // miters are counted per corner (a shared endpoint), not per run end
-  for (const c of rs.corners) { if (gFilter!=='all' && !c.groups.includes(+gFilter)) continue; if (c.kind==='miter_in') m.miterIn++; else if (c.kind==='miter_out') m.miterOut++; else if (c.kind==='miter_bay') m.miterBay++; }
+  m.tieIn = 0; for (const c of rs.corners) { if (gFilter!=='all' && !c.groups.includes(+gFilter)) continue; if (c.kind==='miter_in') m.miterIn++; else if (c.kind==='miter_out') m.miterOut++; else if (c.kind==='miter_bay') m.miterBay++; if (c.tiein && c.kind!=='seam') m.tieIn++; }
   m.outlets = m.ds + m.dropOutlets; return m;
 }
 const colorName = (c, custom) => c==='custom' ? (custom || 'custom') : (c || '—');
@@ -1214,6 +1216,7 @@ function renderMaterials(){
   html += row('End caps', m.endcaps, mm => mm.endcaps||'');
   const mrow = (kind, label, v, fn) => row(`<span class="hl ${cornerHL===kind?'on':''}" data-hl="${kind}">${label} <small>${cornerHL===kind?'▣ shown on drawing — tap to hide':'◻ tap to show on drawing'}</small></span>`, v, fn);
   html += mrow('miter_in','Miters — inside', m.miterIn, mm => mm.miterIn||'') + mrow('miter_out','Miters — outside', m.miterOut, mm => mm.miterOut||'') + mrow('miter_bay','Miters — bay', m.miterBay, mm => mm.miterBay||'');
+  if (m.tieIn) html += `<tr class="sub"><td>&nbsp;&nbsp;incl. tie-in to existing gutter (strip miter)</td><td>${m.tieIn}</td></tr>`;
   html += row('Downspouts (new)', m.ds, mm => mm.ds||'');
   if (m.dsReuse) html += `<tr class="sub"><td>&nbsp;&nbsp;existing — reuse (not counted)</td><td>${m.dsReuse}</td></tr>`;
   for (const s of Object.keys(m.dsBySize)) html += `<tr class="sub"><td>&nbsp;&nbsp;${esc(s)}</td><td>${m.dsBySize[s]}</td></tr>`;
@@ -1337,7 +1340,7 @@ function pdfMaterialsPages(doc){
     doc.setFillColor(...navy); doc.rect(M, y-10, 268, 16, 'F'); doc.setTextColor(...gold); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.text(title + '   (from drawing)', M+6, y+1); y += 18;
     const profs = Object.keys(m.gutter); if (profs.length) profs.forEach(pr => line(`Gutter ${pr}`, fmtLF(m.gutter[pr]))); else line('Gutter','—');
     if (m.sgLF) line(`incl. ${SPLASH_GUARD_LF}' x ${m.acc.splashguard} splash guards`, fmtLF(m.sgLF), true);
-    line('Gutter covers', fmtLF(m.coverLF)); line('End caps', m.endcaps); line('Miters — inside', m.miterIn); line('Miters — outside', m.miterOut); line('Miters — bay', m.miterBay);
+    line('Gutter covers', fmtLF(m.coverLF)); line('End caps', m.endcaps); line('Miters — inside', m.miterIn); line('Miters — outside', m.miterOut); line('Miters — bay', m.miterBay); if (m.tieIn) line('incl. tie-in to existing gutter (strip miter)', m.tieIn, true);
     line('Downspouts (new)', m.ds); if (m.dsReuse) line('existing — reuse (not counted)', m.dsReuse, true); Object.keys(m.dsBySize).forEach(s => line(s, m.dsBySize[s], true)); storyKeys(m.dsByStory).forEach(st => line(storyName(st==='LR'?'LR':+st), m.dsByStory[st], true));
     line('Elbows A', m.elbA); line('Elbows B', m.elbB); OFFSET_SIZES.forEach(sz => line(`Offsets ${sz}`, m.offsets[sz])); line('Drop outlets', m.dropOutlets); line('Outlets (DS + drop)', m.outlets);
     const ovr = job.manual.straps[key]; line('Pipe bands' + (ovr!==undefined?` (override; auto ${m.straps})`:''), ovr!==undefined?ovr:m.straps);
