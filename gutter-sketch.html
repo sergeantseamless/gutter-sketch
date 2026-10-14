@@ -332,6 +332,7 @@ const ENDS = [['auto','Auto'],['endcap','End cap'],['miter_in','Miter inside'],[
 const COVER_TYPES = ['ProGuard','Expanded Metal Mesh','Leaf Blaster Pro'];
 const MANUAL_TEXT = [['fascia','Fascia'],['soffit','Soffit'],['jchannel','J channel'],['collectorBox','Collector box'],['misc','Misc']];   // special-order items, free text (size / color / amount)
 const STORIES = [[1,'1 story'],[1.5,'1.5 story'],[2,'2 story'],[2.5,'2.5 story'],[3,'3 story'],['LR','Lower roof']];
+const dsPieces = st => st==='LR' ? 1 : Math.max(1, Math.ceil(+st||1));   // one downspout piece per story, half stories round up (1.5 → 2)
 const STRAPS = {1:2, 1.5:3, 2:3, 2.5:4, 3:4, LR:2};   // pipe bands per downspout by story (lower-roof drop assumed short)
 const storyLabel = s => s==='LR' ? 'LR' : `${s}st`;
 const dsStoryTag = s => (s==1 && s!=='LR') ? '' : storyLabel(s);   // 1-story downspouts carry no story tag
@@ -1218,13 +1219,14 @@ function computeMaterials(gFilter, rs){ // gFilter: 'all' or group index; rs = r
   rs = rs || resolveEnds();
   const inG = it => gFilter==='all' || (it.g||0)===+gFilter;
   const items = job.items.filter(i => inG(i) && !(i.type==='run' && i.existing));
-  const m = {gutter:{}, coverLF:0, sgLF:0, newLF:0, hangers:0, endcaps:0, endcapL:0, endcapR:0, miterIn:0, miterOut:0, miterBay:0, miterBayIn:0, miterBayOut:0, ds:0, dsReuse:0, dsBySize:{}, dsByStory:{}, elbA:0, elbB:0, offsets:{'2"':0,'4"':0,'6"':0}, outlets:0, straps:0, acc:{splashguard:0,splashblock:0,dropoutlet:0,offset:0,dripedge:0,rainchain:0}, rainchainTerm:0, sbTerm:0};
+  const m = {gutter:{}, coverLF:0, sgLF:0, newLF:0, hangers:0, endcaps:0, endcapL:0, endcapR:0, miterIn:0, miterOut:0, miterBay:0, miterBayIn:0, miterBayOut:0, ds:0, dsReuse:0, dsBySize:{}, dsByStory:{}, elbA:0, elbB:0, offsets:{'2"':0,'4"':0,'6"':0}, outlets:0, straps:0, acc:{splashguard:0,splashblock:0,dropoutlet:0,offset:0,dripedge:0,rainchain:0}, rainchainTerm:0, sbTerm:0, dsPieces:0, dsPiecesBySize:{}};
   for (const it of items) {
     if (it.type==='run') { const L = +it.len||0; m.gutter[it.profile||'?'] = (m.gutter[it.profile||'?']||0) + L; m.newLF += L; if (it.cover) m.coverLF += L;
       const e = rs.ends.get(it.id) || {l:'endcap', r:'endcap'}; const le = rs.side ? leftEnd(it, rs.side) : 1;
       if (e.l==='endcap') { m.endcaps++; if (le===1) m.endcapL++; else m.endcapR++; } if (e.r==='endcap') { m.endcaps++; if (le===2) m.endcapL++; else m.endcapR++; } }
     else if (it.type==='ds' && it.status==='reuse') { m.dsReuse++; }
     else if (it.type==='ds') { m.ds++; m.dsBySize[it.size||'?'] = (m.dsBySize[it.size||'?']||0)+1; const st = it.story||1; m.dsByStory[st] = (m.dsByStory[st]||0)+1;
+      const pc = dsPieces(st); m.dsPieces += pc; m.dsPiecesBySize[it.size||'?'] = (m.dsPiecesBySize[it.size||'?']||0) + pc;
       for (const t of (it.seq||[])) { if (t==='A') m.elbA++; else if (t==='B') m.elbB++; else if (m.offsets[t]!==undefined) m.offsets[t]++; }
       m.straps += STRAPS[st] || 2; if (it.term==='rainchain') m.rainchainTerm++; if (it.term==='splashblock') m.sbTerm++; }
     else if (it.type==='acc') m.acc[it.sub]++;
@@ -1263,10 +1265,11 @@ function renderMaterials(){
   const mrow = (kind, label, v, fn) => row(`<span class="hl ${cornerHL===kind?'on':''}" data-hl="${kind}">${label} <small>${cornerHL===kind?'▣ shown on drawing — tap to hide':'◻ tap to show on drawing'}</small></span>`, v, fn);
   html += mrow('miter_in','Miters — inside', m.miterIn, mm => mm.miterIn||'') + mrow('miter_out','Miters — outside', m.miterOut, mm => mm.miterOut||'') + mrow('miter_bay_out','Bay miters — outside', m.miterBayOut, mm => mm.miterBayOut||'') + mrow('miter_bay_in','Bay miters — inside', m.miterBayIn, mm => mm.miterBayIn||'');
   if (m.tieIn) html += `<tr class="sub"><td>&nbsp;&nbsp;incl. tie-in to existing gutter (strip miter)</td><td>${m.tieIn}</td></tr>`;
-  html += row('Downspouts (new)', m.ds, mm => mm.ds||'');
+  html += row('Downspouts (new) — pieces', m.dsPieces, mm => mm.dsPieces||'');
+  for (const s of Object.keys(m.dsPiecesBySize)) html += `<tr class="sub"><td>&nbsp;&nbsp;${esc(s)} pieces</td><td>${m.dsPiecesBySize[s]}</td></tr>`;
+  if (m.ds) html += `<tr class="sub"><td>&nbsp;&nbsp;drops (one per downspout location)</td><td>${m.ds}</td></tr>`;
+  for (const st of storyKeys(m.dsByStory)) html += `<tr class="sub"><td>&nbsp;&nbsp;&nbsp;&nbsp;${esc(storyName(st==='LR'?'LR':+st))} drops</td><td>${m.dsByStory[st]}</td></tr>`;
   if (m.dsReuse) html += `<tr class="sub"><td>&nbsp;&nbsp;existing — reuse (not counted)</td><td>${m.dsReuse}</td></tr>`;
-  for (const s of Object.keys(m.dsBySize)) html += `<tr class="sub"><td>&nbsp;&nbsp;${esc(s)}</td><td>${m.dsBySize[s]}</td></tr>`;
-  for (const st of storyKeys(m.dsByStory)) html += `<tr class="sub"><td>&nbsp;&nbsp;${esc(storyName(st==='LR'?'LR':+st))}</td><td>${m.dsByStory[st]}</td></tr>`;
   html += row('Elbows A', m.elbA, mm => mm.elbA||'') + row('Elbows B', m.elbB, mm => mm.elbB||'');
   for (const sz of OFFSET_SIZES) html += row(`Offsets ${sz}`, m.offsets[sz], mm => mm.offsets[sz]||'');
   html += row('Drop outlets', m.dropOutlets, mm => mm.dropOutlets||'') + row('Outlets (DS + drop)', m.outlets, mm => mm.outlets||'');
@@ -1431,7 +1434,7 @@ function pdfMaterialsPages(doc){
     const profs = Object.keys(m.gutter); if (profs.length) profs.forEach(pr => line(`Gutter ${pr}`, fmtLF(m.gutter[pr]))); else line('Gutter','—');
     if (m.sgLF) line(`incl. ${SPLASH_GUARD_LF}' x ${m.acc.splashguard} splash guards`, fmtLF(m.sgLF), true);
     line('Gutter covers' + (job.manual.coverType ? ` — ${job.manual.coverType}` : ''), fmtLF(m.coverLF)); line('End caps', m.endcaps); line('left', m.endcapL, true); line('right', m.endcapR, true); line('Miters — inside', m.miterIn); line('Miters — outside', m.miterOut); line('Bay miters — outside', m.miterBayOut); line('Bay miters — inside', m.miterBayIn); if (m.tieIn) line('incl. tie-in to existing gutter (strip miter)', m.tieIn, true);
-    line('Downspouts (new)', m.ds); if (m.dsReuse) line('existing — reuse (not counted)', m.dsReuse, true); Object.keys(m.dsBySize).forEach(s => line(s, m.dsBySize[s], true)); storyKeys(m.dsByStory).forEach(st => line(storyName(st==='LR'?'LR':+st), m.dsByStory[st], true));
+    line('Downspouts (new) — pieces', m.dsPieces); Object.keys(m.dsPiecesBySize).forEach(s => line(s + ' pieces', m.dsPiecesBySize[s], true)); if (m.ds) line('drops (one per downspout location)', m.ds, true); storyKeys(m.dsByStory).forEach(st => line(storyName(st==='LR'?'LR':+st) + ' drops', m.dsByStory[st], true)); if (m.dsReuse) line('existing — reuse (not counted)', m.dsReuse, true);
     line('Elbows A', m.elbA); line('Elbows B', m.elbB); OFFSET_SIZES.forEach(sz => line(`Offsets ${sz}`, m.offsets[sz])); line('Drop outlets', m.dropOutlets); line('Outlets (DS + drop)', m.outlets);
     const ovr = job.manual.straps[key]; line('Pipe bands' + (ovr!==undefined?` (override; auto ${m.straps})`:''), ovr!==undefined?ovr:m.straps);
     const hov = job.manual.hangerOv[key]; line('Hangers' + (hov!==undefined?` (override; auto ${m.hangers})`:` (${fmtLF(m.newLF)} / 2)`), hov!==undefined?hov:m.hangers);
