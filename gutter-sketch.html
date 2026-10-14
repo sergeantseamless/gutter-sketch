@@ -334,6 +334,7 @@ const MANUAL_TEXT = [['fascia','Fascia'],['soffit','Soffit'],['jchannel','J chan
 const STORIES = [[1,'1 story'],[1.5,'1.5 story'],[2,'2 story'],[2.5,'2.5 story'],[3,'3 story'],['LR','Lower roof']];
 const STRAPS = {1:2, 1.5:3, 2:3, 2.5:4, 3:4, LR:2};   // pipe bands per downspout by story (lower-roof drop assumed short)
 const storyLabel = s => s==='LR' ? 'LR' : `${s}st`;
+const dsStoryTag = s => (s==1 && s!=='LR') ? '' : storyLabel(s);   // 1-story downspouts carry no story tag
 const storyName = s => s==='LR' ? 'Lower roof' : `${s} story`;
 const SEQ_TOKENS = ['A','B','2"','4"','6"'];             // elbow / offset tokens, tapped in order
 const OFFSET_SIZES = ['2"','4"','6"'];
@@ -653,7 +654,7 @@ function drawDS(p, d, o){
   const reuse = d.status==='reuse';
   if (reuse) { p.rect(d.x-s/2, d.y-s/2, s, s, {fill:'#fff', color:col, width:2.5}); p.line(d.x-s/2, d.y+s/2, d.x+s/2, d.y-s/2, {color:col, width:2}); }
   else p.rect(d.x-s/2, d.y-s/2, s, s, {fill:col, color: d.g===1?NAVY:undefined, width:1.5});
-  const l1 = reuse ? `REUSE ${d.story?storyLabel(d.story):''}`.trim() : `${seqText(d.seq)||'?'} ${d.story?storyLabel(d.story):'?'}`;
+  const l1 = reuse ? `REUSE ${d.story?dsStoryTag(d.story):''}`.trim() : `${seqText(d.seq)||'?'} ${d.story?dsStoryTag(d.story):'?'}`.trim();
   const s1 = field ? (reuse?13:14) : (reuse?10:11), l2 = (!field && !reuse && d.size && d.size!=='3×4"') ? d.size : null, s2 = 9;
   const w = Math.max(textW(l1, s1), l2 ? textW(l2, s2) : 0), h = s1*1.35 + (l2 ? s2*1.35 + 1 : 0);
   let cx, cy;
@@ -672,14 +673,13 @@ function drawAcc(p, a, o){
   const T = (x,y) => [a.x + x*c - y*s, a.y + x*s + y*c];
   if (o.isSel(a.id)) p.circle(a.x,a.y,18,{fill:GOLD});
   switch(a.sub){
-    case 'splashguard': { const pts=[]; for (let i=0;i<10;i++){ const R = i%2 ? 5 : 12, ang = -Math.PI/2 + i*Math.PI/5; pts.push(T(R*Math.cos(ang), R*Math.sin(ang))); } p.poly(pts,{fill:col,close:true}); break; }
+    case 'splashguard': { const pts=[]; for (let i=0;i<10;i++){ const R = i%2 ? 5 : 12, ang = -Math.PI/2 + i*Math.PI/5; pts.push(T(R*Math.cos(ang), R*Math.sin(ang))); } p.poly(pts,{fill:o.invalid?.has(a.id)?ERR:GOLD, color:NAVY, width:1.5, close:true}); break; }
     case 'splashblock': p.poly([T(-11,-5),T(11,-5),T(11,5),T(-11,5)],{color:col,width:2.5,close:true,fill:'#fff'}); p.line(...T(-11,0),...T(11,0),{color:col,width:1.5}); break;
     case 'dropoutlet': p.circle(a.x, a.y, 8, {fill:'#fff', color:col, width:3}); break;
     case 'offset': p.poly([T(-12,-8),T(-3,-8),T(3,8),T(12,8)],{color:col,width:3}); break;
     case 'dripedge': p.poly([T(-12,-3),T(12,-3),T(12,3),T(-12,3)],{fill:col,close:true}); break;
     case 'rainchain': p.line(...T(0,-12),...T(0,12),{color:col,width:2}); [-8,0,8].forEach(yy=>p.circle(...T(0,yy),3.5,{color:col,width:2,fill:'#fff'})); break;
   }
-  p.text(ACC[a.sub].ab, a.x, a.y+20, {size:9, bold:true, color:col, bg:'#fff'});
   if (a.g) badge(p, a.x+13, a.y-13, a.g, 6);
 }
 function drawHaz(p, h, o){
@@ -996,15 +996,15 @@ function openDsSheet(w, existing){
     <div class="row"><label class="l">Elbows &amp; offsets (tap in order, top to bottom)</label>
       <div class="seg big" id="seqKeys">${SEQ_TOKENS.map(t=>`<button class="btn" data-e="${esc(t)}">${esc(t)}</button>`).join('')}<button class="btn" data-e="bs">⌫</button></div>
       <div class="seqbox" id="seqBox">${esc(seqText(seq))}</div></div>
-    ${field?'':`<div class="row"><label class="l">Termination</label>${segHTML('term', TERMS, cur.term)}</div>
-    <div class="row"><label class="l">Note</label><input type="text" id="dsNote" value="${esc(cur.note||'')}" placeholder="optional"></div>
+    <div class="row"><label class="l">Termination</label>${segHTML('term', TERMS, cur.term, field)}</div>
+    ${field?'':`<div class="row"><label class="l">Note</label><input type="text" id="dsNote" value="${esc(cur.note||'')}" placeholder="optional"></div>
     <div class="row"><label class="l">Group</label>${segHTML('g', GROUPS.map((g,i)=>[i,g.n]), cur.g??0)}</div>`}
     <div class="actions"><button class="btn ghost" id="dsCancel">Cancel</button><button class="btn gold" id="dsDone">DONE</button></div>`, {onCancel:()=>render()});
   const box = ov.querySelector('#seqBox');
   ov.querySelector('#seqKeys').addEventListener('click', e => { const b=e.target.closest('[data-e]'); if(!b) return; if (b.dataset.e==='bs') seq.pop(); else if (seq.length<12) seq.push(b.dataset.e); box.textContent = seqText(seq); });
   ov.querySelector('#dsCancel').onclick = () => { closeSheet(); render(); };
   ov.querySelector('#dsDone').onclick = () => {
-    const sv = segVal(ov,'story'); const story = sv==='LR' ? 'LR' : +sv; const size = field ? cur.size : segVal(ov,'size'); const term = field ? cur.term : segVal(ov,'term'); const note = field ? (cur.note||'') : ov.querySelector('#dsNote').value.trim(); const g = field ? (cur.g??0) : +segVal(ov,'g');
+    const sv = segVal(ov,'story'); const story = sv==='LR' ? 'LR' : +sv; const size = field ? cur.size : segVal(ov,'size'); const term = segVal(ov,'term') || cur.term; const note = field ? (cur.note||'') : ov.querySelector('#dsNote').value.trim(); const g = field ? (cur.g??0) : +segVal(ov,'g');
     const status = segVal(ov,'status') || 'new';
     if (!seq.length && status!=='reuse') { toast('Enter the elbow sequence (A / B / offsets)'); return; }
     closeSheet(); snapshot();
@@ -1218,7 +1218,7 @@ function computeMaterials(gFilter, rs){ // gFilter: 'all' or group index; rs = r
   rs = rs || resolveEnds();
   const inG = it => gFilter==='all' || (it.g||0)===+gFilter;
   const items = job.items.filter(i => inG(i) && !(i.type==='run' && i.existing));
-  const m = {gutter:{}, coverLF:0, sgLF:0, newLF:0, hangers:0, endcaps:0, endcapL:0, endcapR:0, miterIn:0, miterOut:0, miterBay:0, miterBayIn:0, miterBayOut:0, ds:0, dsReuse:0, dsBySize:{}, dsByStory:{}, elbA:0, elbB:0, offsets:{'2"':0,'4"':0,'6"':0}, outlets:0, straps:0, acc:{splashguard:0,splashblock:0,dropoutlet:0,offset:0,dripedge:0,rainchain:0}, rainchainTerm:0};
+  const m = {gutter:{}, coverLF:0, sgLF:0, newLF:0, hangers:0, endcaps:0, endcapL:0, endcapR:0, miterIn:0, miterOut:0, miterBay:0, miterBayIn:0, miterBayOut:0, ds:0, dsReuse:0, dsBySize:{}, dsByStory:{}, elbA:0, elbB:0, offsets:{'2"':0,'4"':0,'6"':0}, outlets:0, straps:0, acc:{splashguard:0,splashblock:0,dropoutlet:0,offset:0,dripedge:0,rainchain:0}, rainchainTerm:0, sbTerm:0};
   for (const it of items) {
     if (it.type==='run') { const L = +it.len||0; m.gutter[it.profile||'?'] = (m.gutter[it.profile||'?']||0) + L; m.newLF += L; if (it.cover) m.coverLF += L;
       const e = rs.ends.get(it.id) || {l:'endcap', r:'endcap'}; const le = rs.side ? leftEnd(it, rs.side) : 1;
@@ -1226,7 +1226,7 @@ function computeMaterials(gFilter, rs){ // gFilter: 'all' or group index; rs = r
     else if (it.type==='ds' && it.status==='reuse') { m.dsReuse++; }
     else if (it.type==='ds') { m.ds++; m.dsBySize[it.size||'?'] = (m.dsBySize[it.size||'?']||0)+1; const st = it.story||1; m.dsByStory[st] = (m.dsByStory[st]||0)+1;
       for (const t of (it.seq||[])) { if (t==='A') m.elbA++; else if (t==='B') m.elbB++; else if (m.offsets[t]!==undefined) m.offsets[t]++; }
-      m.straps += STRAPS[st] || 2; if (it.term==='rainchain') m.rainchainTerm++; }
+      m.straps += STRAPS[st] || 2; if (it.term==='rainchain') m.rainchainTerm++; if (it.term==='splashblock') m.sbTerm++; }
     else if (it.type==='acc') m.acc[it.sub]++;
   }
   for (const it of job.items) if (inG(it) && it.type==='run' && it.existing && it.cover) m.coverLF += (+it.len||0);   // covers on existing gutter
@@ -1237,7 +1237,7 @@ function computeMaterials(gFilter, rs){ // gFilter: 'all' or group index; rs = r
   const gc = job.manual.gutterColor; m.paint = (gc && !NO_PAINT_COLORS.includes(gc) && job.manual.wedges && job.manual.wedges!=='none') ? 1 : 0;
   // miters are counted per corner (a shared endpoint), not per run end
   m.tieIn = 0; for (const c of rs.corners) { if (gFilter!=='all' && !c.groups.includes(+gFilter)) continue; if (c.kind==='miter_in') m.miterIn++; else if (c.kind==='miter_out') m.miterOut++; else if (c.kind==='miter_bay_in') m.miterBayIn++; else if (c.kind==='miter_bay_out') m.miterBayOut++; if (c.tiein && c.kind!=='seam') m.tieIn++; }
-  m.miterBay = m.miterBayIn + m.miterBayOut; m.rainchains = (m.acc.rainchain||0) + (m.rainchainTerm||0); m.rcKits = m.rainchains;   // one install kit per rain chain
+  m.miterBay = m.miterBayIn + m.miterBayOut; m.rainchains = (m.acc.rainchain||0) + (m.rainchainTerm||0); m.rcKits = m.rainchains; m.splashblocks = (m.acc.splashblock||0) + (m.sbTerm||0);   // one install kit per rain chain
   m.outlets = m.ds + m.dropOutlets; return m;
 }
 const colorName = (c, custom) => c==='custom' ? (custom || 'custom') : (c || '—');
@@ -1273,7 +1273,7 @@ function renderMaterials(){
   html += `<tr><td>Pipe bands <span style="font-size:11px;color:#555">(auto ${m.straps})</span></td><td><input type="number" inputmode="numeric" id="strapOv" placeholder="${m.straps}" value="${ov??''}"></td></tr>`;
   const hov = job.manual.hangerOv[strapKey]; html += `<tr><td>Hangers <span style="font-size:11px;color:#555">(auto ${m.hangers} = ${fmtLF(m.newLF)} ÷ 2)</span></td><td><input type="number" inputmode="numeric" id="hangerOv" placeholder="${m.hangers}" value="${hov??''}"></td></tr>`;
   html += row('Touch-up spray paint', m.paint ? `1 can — ${esc(colorName(job.manual.gutterColor, job.manual.gutterCustom))}` : '0');
-  html += row('Splash guards', m.acc.splashguard, mm => mm.acc.splashguard||'') + row('Splash blocks', m.acc.splashblock, mm => mm.acc.splashblock||'') + row('Rain chains', m.rainchains, mm => mm.rainchains||'');
+  html += row('Splash guards', m.acc.splashguard, mm => mm.acc.splashguard||'') + row('Splash blocks', m.splashblocks, mm => mm.splashblocks||'') + row('Rain chains', m.rainchains, mm => mm.rainchains||'');
   const rov = job.manual.rcKitOv[strapKey]; html += `<tr><td>Rain chain install kits <span style="font-size:11px;color:#555">(auto ${m.rcKits} = 1 per chain)</span></td><td><input type="number" inputmode="numeric" id="rcKitOv" placeholder="${m.rcKits}" value="${rov??''}"></td></tr>`;
   html += row('Drip edge extension', m.de ? 'Yes' : 'No', mm => mm.de ? 'Yes' : '');
   html += `</table>`;
@@ -1294,7 +1294,6 @@ function renderMaterials(){
     <label>Flex pipes<input type="number" inputmode="numeric" data-m="flexPipes" value="${esc(mn.flexPipes)}"></label>
     <label>Geocel (tubes)<input type="number" inputmode="numeric" data-m="geocel" value="${esc(mn.geocel)}"></label>
     <label>Screws<input type="number" inputmode="numeric" data-m="screws" value="${esc(mn.screws)}"></label>
-    <label>PO delivery<select data-m="poDelivery"><option value="">—</option><option value="Yes" ${mn.poDelivery==='Yes'?'selected':''}>Yes</option><option value="No" ${mn.poDelivery==='No'?'selected':''}>No</option></select></label>
     <h4 class="full" style="margin:6px 0 0">Special order <span class="tag">size / color / amount</span></h4>
     ${MANUAL_TEXT.map(([k,l]) => `<label>${l}<input data-m="${k}" value="${esc(mn[k]||'')}" placeholder="e.g. 24' 1×6 white"></label>`).join('')}
     <label class="full">Additional notes<textarea data-m="notes" rows="3">${esc(mn.notes)}</textarea></label></div>`;
@@ -1364,13 +1363,48 @@ function pdfFrame(doc, title, pageNo, pageTotal){
   doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.text('5876 Old Timuquana Rd, Jacksonville FL 32210  ·  contact@sergeantseamless.com', PW-M, PH-19, {align:'right'});
   doc.setTextColor(...grey); doc.setFontSize(6.5); doc.text(`Page ${pageNo} of ${pageTotal}  ·  ${filenameBase()}`, PW-M, PH-9, {align:'right'});
 }
-function legendText(){ return [
-  'MARKS:  cross tick = end cap  |  corners = miters (counted on the material list)  |  BAY chip = bay miter (45° corner)  |  dashed tail = continues  |  circle = drop outlet',
-  'DOWNSPOUT label = elbows/offsets top to bottom + story (e.g. "AA 2" 2" B 2st"; LR = drops onto lower roof).  Dashed line beside a run = gutter cover; thin solid line inside a run = drip edge extension.',
-  'Grey dashed run = EXISTING gutter, not counted.  Hollow slashed square = existing downspout to REUSE (not counted).  Red-orange circles = hazards / attention (not counted).' ]; }
+// legend: only the symbols that actually appear on this drawing
+const LEGEND_DEFS = [['gutter','Gutter'],['existing','Existing gutter'],['cover','Gutter cover'],['ds','Downspout'],['reuse','Reuse existing downspout'],['splashguard','Splash guard'],['splashblock','Splash block'],['dropoutlet','Drop outlet'],['rainchain','Rain chain']];
+function legendRowCount(){ const c = document.createElement('canvas').getContext('2d'); c.font='400 7.5px Helvetica,Arial'; return legendRows(t => c.measureText(t).width, PW-2*M).length; }
+function legendKeys(){
+  const has = new Set();
+  for (const it of job.items) {
+    if (it.type==='run') { has.add(it.existing ? 'existing' : 'gutter'); if (it.cover) has.add('cover'); }
+    else if (it.type==='ds') has.add(it.status==='reuse' ? 'reuse' : 'ds');
+    else if (it.type==='acc' && ['splashguard','splashblock','dropoutlet','rainchain'].includes(it.sub)) has.add(it.sub);
+  }
+  return LEGEND_DEFS.filter(d => has.has(d[0]));
+}
+const LG_GLYPH = 20, LG_GAP = 4, LG_SEP = 14, LG_ROW = 13;
+function legendRows(measure, maxW){ // -> [[{key,label,x}]]
+  const ind = measure('LEGEND:') + 8, rows = []; let row = [], x = ind;
+  for (const [key,label] of legendKeys()) { const w = LG_GLYPH + LG_GAP + measure(label); if (row.length && x + w > maxW) { rows.push(row); row = []; x = ind; } row.push({key,label,x}); x += w + LG_SEP; }
+  if (row.length) rows.push(row); return rows;
+}
+function legendGlyph(p, key, x, cy){ // x = left edge, cy = vertical center, page units
+  const r = x + LG_GLYPH, mx = x + LG_GLYPH/2;
+  switch (key) {
+    case 'gutter': p.line(x, cy, r, cy, {color:NAVY, width:2.5}); break;
+    case 'existing': p.line(x, cy, r, cy, {color:'#7a7a7a', width:2, dash:[4,3]}); break;
+    case 'cover': p.line(x, cy+2, r, cy+2, {color:NAVY, width:2.5}); p.line(x, cy-2.5, r, cy-2.5, {color:NAVY, width:1.2, dash:[3,2]}); break;
+    case 'ds': p.rect(mx-4, cy-4, 8, 8, {fill:NAVY}); break;
+    case 'reuse': p.rect(mx-4, cy-4, 8, 8, {fill:'#fff', color:NAVY, width:1.3}); p.line(mx-4, cy+4, mx+4, cy-4, {color:NAVY, width:1.1}); break;
+    case 'splashguard': { const pts=[]; for (let i=0;i<10;i++){ const R = i%2 ? 2.6 : 6, a = -Math.PI/2 + i*Math.PI/5; pts.push([mx+R*Math.cos(a), cy+R*Math.sin(a)]); } p.poly(pts, {fill:GOLD, color:NAVY, width:0.9, close:true}); break; }
+    case 'splashblock': p.rect(mx-6, cy-2.75, 12, 5.5, {fill:'#fff', color:NAVY, width:1.3}); p.line(mx-6, cy, mx+6, cy, {color:NAVY, width:0.8}); break;
+    case 'dropoutlet': p.circle(mx, cy, 4, {fill:'#fff', color:NAVY, width:1.5}); break;
+    case 'rainchain': p.line(mx, cy-6, mx, cy+6, {color:NAVY, width:1}); [-4,0,4].forEach(d => p.circle(mx, cy+d, 1.8, {fill:'#fff', color:NAVY, width:1})); break;
+  }
+}
+// draws the legend; text(str,x,baselineY) and measure(str) are supplied by the PDF / canvas caller
+function drawLegend(p, text, measure, ly){
+  const rows = legendRows(measure, PW-2*M); if (!rows.length) return ly;
+  text('LEGEND:', M, ly, true);
+  for (const row of rows) { for (const it of row) { legendGlyph(p, it.key, M + it.x, ly-3); text(it.label, M + it.x + LG_GLYPH + LG_GAP, ly, false); } ly += LG_ROW; }
+  return ly;
+}
 function pdfDrawingPage(doc){
   const {navy,maroon} = RGB; const groups = activeGroups().filter(g=>g>0);
-  const legendH = 12 + (groups.length?14:0) + 3*10 + 12;
+  const legendH = 12 + (groups.length?14:0) + legendRowCount()*LG_ROW + 12;
   const area = {x:M, y:FRAME.bodyTop, w:PW-2*M, h:FRAME.footerRule - 10 - legendH - FRAME.bodyTop};
   doc.setDrawColor(...navy); doc.setLineWidth(1); doc.rect(area.x,area.y,area.w,area.h);
   const bb = sceneBBox(); const k = Math.min(area.w/bb.w, area.h/bb.h); const ox = area.x + (area.w - bb.w*k)/2, oy = area.y + (area.h - bb.h*k)/2;
@@ -1378,8 +1412,9 @@ function pdfDrawingPage(doc){
   const rs = resolveEnds(); const p = pdfPainter(doc, ox, oy, bb.x, bb.y, k); const o = {field:false, isSel: () => false, invalid:new Set(), ends: rs.ends, dom: dominantProfile(), placed: []}; drawScene(p,o); drawPins(p,o);
   let ly = area.y+area.h+14, lx = M; doc.setFontSize(8.5); doc.setFont('helvetica','bold'); doc.setTextColor(...navy);
   if (groups.length) { doc.text('OPTIONS:', lx, ly); lx += 48; for (const g of groups) { const c=GROUPS[g].c; doc.setFillColor(parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16)); doc.setDrawColor(...navy); doc.rect(lx, ly-7, 10, 10, 'FD'); doc.setFont('helvetica','normal'); doc.text(`${g} = ${GROUPS[g].n}`, lx+14, ly); lx += 14 + doc.getTextWidth(`${g} = ${GROUPS[g].n}`) + 14; } ly += 14; }
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
-  for (const t of legendText()) doc.splitTextToSize(t, PW-2*M).forEach(l => { doc.text(l, M, ly); ly += 9.5; });
+  { const lp = pdfPainter(doc, 0, 0, 0, 0, 1); const meas = t => { doc.setFont('helvetica','normal'); doc.setFontSize(7.5); return doc.getTextWidth(t); };
+    const txt = (t, tx, ty, b) => { doc.setFont('helvetica', b?'bold':'normal'); doc.setFontSize(7.5); doc.setTextColor(...navy); doc.text(t, tx, ty); };
+    ly = drawLegend(lp, txt, meas, ly); }
   doc.setFont('helvetica','bold'); doc.setTextColor(...maroon); doc.text('Schematic — NOT TO SCALE. Lengths are field measurements in feet.', M, ly+1);
 }
 function pdfMaterialsPages(doc){
@@ -1401,7 +1436,7 @@ function pdfMaterialsPages(doc){
     const ovr = job.manual.straps[key]; line('Pipe bands' + (ovr!==undefined?` (override; auto ${m.straps})`:''), ovr!==undefined?ovr:m.straps);
     const hov = job.manual.hangerOv[key]; line('Hangers' + (hov!==undefined?` (override; auto ${m.hangers})`:` (${fmtLF(m.newLF)} / 2)`), hov!==undefined?hov:m.hangers);
     line('Touch-up spray paint', m.paint ? `1 can - ${colorName(job.manual.gutterColor, job.manual.gutterCustom)}` : 0);
-    line('Splash guards', m.acc.splashguard); line('Splash blocks', m.acc.splashblock); line('Rain chains', m.rainchains);
+    line('Splash guards', m.acc.splashguard); line('Splash blocks', m.splashblocks); line('Rain chains', m.rainchains);
     const rov = job.manual.rcKitOv[key]; line('Rain chain install kits' + (rov!==undefined?` (override; auto ${m.rcKits})`:''), rov!==undefined?rov:m.rcKits); line('Drip edge extension', m.de ? 'Yes' : 'No');
     y += 10;
   }
@@ -1409,7 +1444,7 @@ function pdfMaterialsPages(doc){
   doc.setPage(1); let my = FRAME.bodyTop + 6; const mn = job.manual;
   doc.setFillColor(...gold); doc.rect(colR, my-10, PW-M-colR, 16, 'F'); doc.setTextColor(...navy); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.text('JOB DETAILS', colR+6, my+1); my += 18;
   const mline = (l,v) => { doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(...navy); doc.text(l, colR+6, my); doc.setFont('helvetica','bold'); const vs = String(v||'—'); const lw = doc.getTextWidth(l), room = (PW-M-4) - (colR+6+lw) - 8; let fs = 10; while (fs > 6.5 && doc.getTextWidth(vs) > room) { fs -= 0.5; doc.setFontSize(fs); } doc.text(vs, PW-M-4, my, {align:'right'}); doc.setDrawColor(225); doc.line(colR, my+4, PW-M, my+4); my += 15; };
-  mline('Gutter color', colorName(mn.gutterColor, mn.gutterCustom)); mline('Downspout color', colorName(mn.dsColor, mn.dsCustom)); mline('Gutter cover type', mn.coverType); mline('Wedges', (WEDGES.find(w=>w[0]===(mn.wedges||'none'))||WEDGES[0])[1]); mline('Flex pipes', mn.flexPipes); mline('Geocel (tubes)', mn.geocel); mline('Screws', mn.screws); mline('PO delivery', mn.poDelivery);
+  mline('Gutter color', colorName(mn.gutterColor, mn.gutterCustom)); mline('Downspout color', colorName(mn.dsColor, mn.dsCustom)); mline('Gutter cover type', mn.coverType); mline('Wedges', (WEDGES.find(w=>w[0]===(mn.wedges||'none'))||WEDGES[0])[1]); mline('Flex pipes', mn.flexPipes); mline('Geocel (tubes)', mn.geocel); mline('Screws', mn.screws);
   my += 8; doc.setFillColor(...gold); doc.rect(colR, my-10, PW-M-colR, 16, 'F'); doc.setTextColor(...navy); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.text('SPECIAL ORDER', colR+6, my+1); my += 18;
   MANUAL_TEXT.forEach(([k,l]) => mline(l, mn[k]));
   my += 8; doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.text('ADDITIONAL NOTES', colR+6, my); my += 13; doc.setFont('helvetica','normal'); doc.setFontSize(9.5); const noteLines = doc.splitTextToSize(mn.notes||'—', PW-M-colR-10); doc.text(noteLines, colR+6, my);
@@ -1446,7 +1481,7 @@ function exportDrawingPNG(){
   const S = 3; const c = document.createElement('canvas'); c.width = PW*S; c.height = PH*S; const x = c.getContext('2d'); x.scale(S,S);
   canvasFrame(x, 'JOB DRAWING');
   const hex = a => `rgb(${a[0]},${a[1]},${a[2]})`; const groups = activeGroups().filter(g=>g>0);
-  const legendH = 12 + (groups.length?14:0) + 3*10 + 12;
+  const legendH = 12 + (groups.length?14:0) + legendRowCount()*LG_ROW + 12;
   const area = {x:M, y:FRAME.bodyTop, w:PW-2*M, h:FRAME.footerRule - 10 - legendH - FRAME.bodyTop};
   x.strokeStyle=hex(RGB.navy); x.lineWidth=1; x.strokeRect(area.x,area.y,area.w,area.h);
   const bb = sceneBBox(); const k = Math.min(area.w/bb.w, area.h/bb.h); const ox = area.x + (area.w - bb.w*k)/2, oy = area.y + (area.h - bb.h*k)/2;
@@ -1455,9 +1490,9 @@ function exportDrawingPNG(){
   const rs = resolveEnds(); const o = {field:false, isSel: () => false, invalid:new Set(), ends: rs.ends, dom: dominantProfile(), placed: []}; drawScene(p,o); drawPins(p,o); x.restore();
   let ly = area.y+area.h+14, lx = M; x.textBaseline='alphabetic'; x.textAlign='left';
   if (groups.length) { x.fillStyle=hex(RGB.navy); x.font='700 8.5px Helvetica,Arial'; x.fillText('OPTIONS:', lx, ly); lx += 48; for (const g of groups) { x.fillStyle=GROUPS[g].c; x.fillRect(lx, ly-7, 10, 10); x.strokeStyle=hex(RGB.navy); x.strokeRect(lx, ly-7, 10, 10); x.fillStyle=hex(RGB.navy); x.font='400 8.5px Helvetica,Arial'; const t=`${g} = ${GROUPS[g].n}`; x.fillText(t, lx+14, ly); lx += 14 + x.measureText(t).width + 14; } ly += 14; }
-  x.fillStyle=hex(RGB.navy); x.font='400 7.5px Helvetica,Arial';
-  const wrap = (t) => { const words=t.split(' '); let line=''; for (const w of words) { const test=line?line+' '+w:w; if (x.measureText(test).width > PW-2*M && line) { x.fillText(line, M, ly); ly += 9.5; line = w; } else line = test; } if (line) { x.fillText(line, M, ly); ly += 9.5; } };
-  for (const t of legendText()) wrap(t);
+  { const lp = canvasPainter(x); const meas = t => { x.font='400 7.5px Helvetica,Arial'; return x.measureText(t).width; };
+    const txt = (t, tx, ty, b) => { x.font=`${b?700:400} 7.5px Helvetica,Arial`; x.fillStyle=hex(RGB.navy); x.textAlign='left'; x.textBaseline='alphabetic'; x.fillText(t, tx, ty); };
+    ly = drawLegend(lp, txt, meas, ly); }
   x.fillStyle=hex(RGB.maroon); x.font='700 7.5px Helvetica,Arial'; x.fillText('Schematic — NOT TO SCALE. Lengths are field measurements in feet.', M, ly+1);
   deliver(dataURLtoBlob(c.toDataURL('image/png')), filenameBase()+'_drawing.png');
 }
