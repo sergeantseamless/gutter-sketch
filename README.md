@@ -31,6 +31,8 @@ Keep it that way. No customer data, exports, credentials or other files belong i
 
 ## Version history
 
+- **v3.3** (2026-10-14) — **Text callouts**: new "To lower roof" preset (alongside Tie-in / Tear out / Reuse existing DS); the note box is now 4 rows tall for typing or writing with the Pencil (up to 200 characters, line breaks kept and stacked on the drawing). Smooth square offsets confirmed not counted (custom-cut, same as v3.2).
+
 - **v3.2** (2026-10-14) — **Geocel counted automatically**: 1 tube per 3 miters (inside, outside, bay; rounded up); a job with no miters gets 1 tube per 20 end caps (minimum 1). Shown with its math next to hangers, and can be typed over. **Round downspouts**: A/B elbows on a 4" Round downspout count on their own "Round elbows (4\")" line (one part; A/B only tells the crew placement), and their offsets get "Round offsets" lines by size. **Smooth square**: elbows and offsets are custom-cut from downspout stock, so they are not counted. Drawing labels unchanged.
 
 - **v3.1.1** (2026-10-14) — **Downspout pieces fix**: the material list now counts downspout pieces by story, not just drops — one piece per story, half stories round up (1 st = 1, 1.5 / 2 st = 2, 2.5 / 3 st = 3, lower roof = 1). Shown as "Downspouts (new) — pieces" with pieces by size, then drops and drops by story underneath. Outlets and pipe bands still count per drop.

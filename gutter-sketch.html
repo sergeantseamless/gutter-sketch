@@ -339,7 +339,7 @@ const dsStoryTag = s => (s==1 && s!=='LR') ? '' : storyLabel(s);   // 1-story do
 const storyName = s => s==='LR' ? 'Lower roof' : `${s} story`;
 const SEQ_TOKENS = ['A','B','2"','4"','6"'];             // elbow / offset tokens, tapped in order
 const OFFSET_SIZES = ['2"','4"','6"'];
-const CALLOUT_PRESETS = ['Tie-in', 'Tear out', 'Reuse existing DS'];
+const CALLOUT_PRESETS = ['Tie-in', 'Tear out', 'Reuse existing DS', 'To lower roof'];
 const DS_SIZES = ['3×4"','4" Round','4×5"','2×3"','Smooth Square'];                 // matches the Jobber "Downspout size" field
 const DS_SIZE_MAP = {'3x4':'3×4"','4" round':'4" Round','4x5':'4×5"','square':'Smooth Square'};
 const TERMS = [['splashblock','Splash block'],['drain','Drain'],['driveway','Driveway'],['rainchain','Rain chain'],['other','Other']];
@@ -704,7 +704,8 @@ function drawText(p, t, o){
   if (o.isSel(t.id)) p.circle(t.x,t.y,10,{fill:GOLD});
   p.line(t.lx,t.ly,t.x,t.y,{color:col,width:1.5});
   p.circle(t.lx,t.ly,3,{fill:col});
-  p.text(t.text||'…', t.x, t.y, {size:12, bold:true, color:col, bg:'#fff', bgStroke:col});
+  const tl = String(t.text||'…').split(/\n+/).map(l=>l.trim()).filter(Boolean); if (!tl.length) tl.push('…');   // multi-line notes stack, centered on the callout point
+  tl.forEach((l,i) => p.text(l, t.x, t.y + (i - (tl.length-1)/2)*16, {size:12, bold:true, color:col, bg:'#fff', bgStroke:col}));
   if (o.isSel(t.id)) p.circle(t.lx,t.ly,7,{fill:'#fff',color:NAVY,width:2});
 }
 function drawScene(p, o){
@@ -1015,13 +1016,13 @@ function openDsSheet(w, existing){
   };
 }
 function openTextSheet(w, existing){
-  const ov = openSheet(`<h3>${existing?'Edit note':'Text callout'}</h3><div class="row"><input type="text" id="txtIn" value="${esc(existing?existing.text:'')}" placeholder="Short note" maxlength="60"></div>
+  const ov = openSheet(`<h3>${existing?'Edit note':'Text callout'}</h3><div class="row"><textarea id="txtIn" rows="4" maxlength="200" placeholder="Note: type, or write with the Pencil" style="min-height:150px;resize:none;line-height:1.35">${esc(existing?existing.text:'')}</textarea></div>
     <div class="row seg">${CALLOUT_PRESETS.map(t=>`<button class="btn" data-preset="${esc(t)}">${esc(t)}</button>`).join('')}</div>
     <div class="actions"><button class="btn ghost" id="txCancel">Cancel</button><button class="btn gold" id="txDone">DONE</button></div>`, {onCancel:()=>render()});
   const inp = ov.querySelector('#txtIn'); setTimeout(()=>inp.focus(), 50);
   ov.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => { inp.value = b.dataset.preset; });
   const done = () => { const t = inp.value.trim(); if (!t) { toast('Type a note'); return; } closeSheet(); snapshot(); if (existing) existing.text = t; else job.items.push({type:'text', id:uid(), g:curGroup, text:t, lx:w.x, ly:w.y, x:w.x+60, y:w.y-50}); afterItemsChanged(); if (existing) showProps(); };
-  ov.querySelector('#txDone').onclick = done; inp.addEventListener('keydown', e => { if (e.key==='Enter') done(); });
+  ov.querySelector('#txDone').onclick = done;
   ov.querySelector('#txCancel').onclick = () => { closeSheet(); render(); };
 }
 function confirmSheet(msg, okLabel, cb){ const ov = openSheet(`<h3>${esc(msg)}</h3><div class="actions"><button class="btn ghost" id="cNo">Cancel</button><button class="btn red" id="cYes">${esc(okLabel)}</button></div>`); ov.querySelector('#cNo').onclick = closeSheet; ov.querySelector('#cYes').onclick = () => { closeSheet(); cb(); }; }
@@ -1312,7 +1313,7 @@ function renderMaterials(){
 /* ---------------- export ---------------- */
 function sceneBBox(){
   let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity; const add=(x,y)=>{ if(x<x0)x0=x; if(y<y0)y0=y; if(x>x1)x1=x; if(y>y1)y1=y; };
-  for (const it of job.items) { if (it.type==='run') { add(it.x1,it.y1); add(it.x2,it.y2); } else if (it.type==='ink') it.pts.forEach(q=>add(q[0],q[1])); else if (it.type==='text' || it.type==='tag') { add(it.x-60,it.y-15); add(it.x+60,it.y+15); if (it.lx!==undefined) add(it.lx,it.ly); } else { add(it.x-25,it.y-25); add(it.x+25,it.y+35); } }
+  for (const it of job.items) { if (it.type==='run') { add(it.x1,it.y1); add(it.x2,it.y2); } else if (it.type==='ink') it.pts.forEach(q=>add(q[0],q[1])); else if (it.type==='text' || it.type==='tag') { const ex = it.type==='text' ? (String(it.text||'').split(/\n+/).filter(Boolean).length-1)*8 : 0; add(it.x-60,it.y-15-ex); add(it.x+60,it.y+15+ex); if (it.lx!==undefined) add(it.lx,it.ly); } else { add(it.x-25,it.y-25); add(it.x+25,it.y+35); } }
   for (const p of job.photos) add(p.x,p.y);
   const fp = bgFootprint(); if (fp) { add(fp.x,fp.y); add(fp.x+fp.w,fp.y+fp.h); }
   if (x0===Infinity) { x0=0;y0=0;x1=400;y1=300; }
