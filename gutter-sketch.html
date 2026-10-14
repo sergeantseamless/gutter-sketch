@@ -990,6 +990,10 @@ function openTextSheet(w, existing){
 function confirmSheet(msg, okLabel, cb){ const ov = openSheet(`<h3>${esc(msg)}</h3><div class="actions"><button class="btn ghost" id="cNo">Cancel</button><button class="btn red" id="cYes">${esc(okLabel)}</button></div>`); ov.querySelector('#cNo').onclick = closeSheet; ov.querySelector('#cYes').onclick = () => { closeSheet(); cb(); }; }
 
 /* ---------------- props panel (select tool) ---------------- */
+function setRunStatus(r, existing){
+  if (existing) { r.existing = true; }
+  else { delete r.existing; r.profile ||= job.defaults.profile; r.story ||= 1; r.lend ||= 'auto'; r.rend ||= 'auto'; }
+}
 function hideProps(){ $('#props').classList.add('hidden'); }
 function showMultiProps(){
   const el = $('#props'); const items = job.items.filter(i => multi.has(i.id));
@@ -999,16 +1003,18 @@ function showMultiProps(){
   const groupable = items.filter(i => i.type!=='haz' && i.type!=='tag'); const runs = items.filter(i => i.type==='run');
   const cs = new Set(runs.map(r => !!r.cover)); const ccur = cs.size===1 ? ([...cs][0] ? '1' : '0') : null;
   const ds2 = new Set(runs.map(r => !!r.de)); const dcur = ds2.size===1 ? ([...ds2][0] ? '1' : '0') : null;
+  const xs = new Set(runs.map(r => !!r.existing)); const xcur = xs.size===1 ? ([...xs][0] ? 'existing' : 'new') : null;
   const gs = new Set(groupable.map(i => i.g||0)); const gcur = gs.size===1 ? [...gs][0] : null;
   el.innerHTML = `<h3>${items.length} selected</h3>${selAll}
     ${groupable.length ? `<div class="row"><label class="l">Move all to group</label>${segHTML('g', GROUPS.map((g,i)=>[i,g.short]), gcur)}</div>` : ''}
-    ${runs.length ? `<div class="row"><label class="l">Gutter covers on ${runs.length} run${runs.length>1?'s':''}</label>${segHTML('cover', [['0','Off'],['1','On']], ccur)}</div><div class="row"><label class="l">Drip edge extension</label>${segHTML('de', [['0','No'],['1','Yes']], dcur)}</div>` : ''}
+    ${runs.length ? `<div class="row"><label class="l">${runs.length} run${runs.length>1?'s are':' is'}</label>${segHTML('rstatus', [['new','NEW gutter'],['existing','EXISTING (dashed)']], xcur)}</div><div class="row"><label class="l">Gutter covers on ${runs.length} run${runs.length>1?'s':''}</label>${segHTML('cover', [['0','Off'],['1','On']], ccur)}</div><div class="row"><label class="l">Drip edge extension</label>${segHTML('de', [['0','No'],['1','Yes']], dcur)}</div>` : ''}
     <div class="row" style="font-size:12px">${items.filter(i=>i.type==='run').length} runs · ${items.filter(i=>i.type==='ds').length} downspouts · ${items.length - items.filter(i=>i.type==='run'||i.type==='ds').length} other</div>
     <div class="actions" style="justify-content:space-between"><button class="btn red" id="pMultiDel">Delete all</button><span><button class="btn" id="pMultiClear">Clear</button> <button class="btn ghost" id="pMultiOff">Done</button></span></div>`;
   el.classList.remove('hidden');
   wireSeg(el,'g', v => { snapshot(); groupable.forEach(i => i.g = +v); afterItemsChanged(); showProps(); });
   wireSeg(el,'cover', v => { snapshot(); runs.forEach(r => r.cover = v==='1'); afterItemsChanged(); showProps(); });
   wireSeg(el,'de', v => { snapshot(); runs.forEach(r => r.de = v==='1'); afterItemsChanged(); showProps(); });
+  wireSeg(el,'rstatus', v => { snapshot(); runs.forEach(r => setRunStatus(r, v==='existing')); afterItemsChanged(); showProps(); });
   wireSelAll();
   el.querySelector('#pMultiDel').onclick = () => { snapshot(); job.items = job.items.filter(i => !multi.has(i.id)); multi.clear(); afterItemsChanged(); showProps(); };
   el.querySelector('#pMultiClear').onclick = () => { multi.clear(); showProps(); render(); };
@@ -1020,10 +1026,11 @@ function showProps(){
   const grp = (it.type==='haz' || it.type==='tag') ? '' : `<div class="row"><label class="l">Group</label>${segHTML('g', GROUPS.map((g,i)=>[i,g.short]), it.g??0)}</div>`;
   let body = '';
   const rsv = it.type==='run' && !it.existing ? (resolveEnds().ends.get(it.id) || {l:'endcap', r:'endcap'}) : null;
-  if (it.type==='run' && it.existing) body = `<div class="row"><b>Existing gutter — stays; not counted as gutter</b></div><div class="row"><label class="l">Length (ft, optional)</label><input type="number" inputmode="decimal" id="pLen" value="${it.len||''}" step="0.5"><button class="btn sm" id="pPad">Pad</button></div>
+  const statusRow = `<div class="row"><label class="l">This run is</label>${segHTML('rstatus', [['new','NEW gutter'],['existing','EXISTING (dashed)']], it.existing?'existing':'new')}</div>`;
+  if (it.type==='run' && it.existing) body = statusRow + `<div class="row"><b>Existing gutter — stays; not counted as gutter</b></div><div class="row"><label class="l">Length (ft, optional)</label><input type="number" inputmode="decimal" id="pLen" value="${it.len||''}" step="0.5"><button class="btn sm" id="pPad">Pad</button></div>
     <div class="row"><label class="l">Add gutter cover</label>${segHTML('cover', [['0','No'],['1','Yes']], it.cover?'1':'0')}</div>
     <div class="row"><label class="l">Drip edge extension</label>${segHTML('de', [['0','No'],['1','Yes']], it.de?'1':'0')}</div>`;
-  else if (it.type==='run') body = `<div class="row"><label class="l">Length (ft)</label><input type="number" inputmode="decimal" id="pLen" value="${it.len||''}" step="0.5"><button class="btn sm" id="pPad">Pad</button></div>
+  else if (it.type==='run') body = statusRow + `<div class="row"><label class="l">Length (ft)</label><input type="number" inputmode="decimal" id="pLen" value="${it.len||''}" step="0.5"><button class="btn sm" id="pPad">Pad</button></div>
     <div class="row"><label class="l">Profile</label>${segHTML('profile', PROFILES, it.profile)}</div>
     <div class="row"><label class="l">Gutter cover</label>${segHTML('cover', [['0','Off'],['1','On']], it.cover?'1':'0')}</div>
     <div class="row"><label class="l">Drip edge extension</label>${segHTML('de', [['0','No'],['1','Yes']], it.de?'1':'0')}</div>
@@ -1043,6 +1050,7 @@ function showProps(){
     el.querySelector('#pPad').onclick = () => openLengthPad(null,null,it);
   }
   if (it.type==='run') wireSeg(el,'de', v => upd(()=>{ it.de=v==='1'; }));
+  if (it.type==='run') wireSeg(el,'rstatus', v => upd(()=> setRunStatus(it, v==='existing')));
   if (it.type==='run' && it.existing) wireSeg(el,'cover', v => upd(()=>{ it.cover=v==='1'; }));
   if (it.type==='run' && !it.existing) {
     wireSeg(el,'profile', v => upd(()=>{ it.profile=v; job.defaults.profile=v; }));
