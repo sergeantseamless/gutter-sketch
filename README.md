@@ -31,6 +31,8 @@ Keep it that way. No customer data, exports, credentials or other files belong i
 
 ## Version history
 
+- **v3.0** (2026-10-13) — **Box select**: in Multi mode, drag the Pencil across empty canvas to draw a box; runs fully inside it and any downspout / accessory / label inside it join the selection (finger drag still pans; tap still toggles single items). **Material list matched to the 2025 Material List sheet**: end caps split **left / right** (left = on your left standing in the street facing the gutter); bay miters split **outside / inside** and now detected automatically from the corner angle (≈45° turn = bay, 90° = strip; double-tap a corner cycles auto → flipped → bay → bay flipped); **gutter cover type** dropdown (ProGuard / Expanded Metal Mesh / Leaf Blaster Pro) shown on the covers line; **rain chain install kits** auto (1 per chain, overridable); new manual fields Geocel (tubes), Screws, PO delivery, and a **Special order** block for Fascia, Soffit, J channel, Collector box, Misc (free text: size / color / amount); "Spray paint" renamed "Touch-up spray paint". All of it prints on the materials PDF. Saved jobs upgrade automatically (old "bay" corners become bay-outside).
+
 - **v2.9.1** (2026-10-13) — the grey "existing" word is gone from dashed runs; they show only a length if one was entered.
 
 - **v2.9** (2026-10-13) — any run can be switched between **NEW gutter** and **EXISTING (dashed)** after the fact, in the run panel or via Multi for a batch; length, covers, group and drip-edge settings carry over, and the gutter LF / end caps / hangers update accordingly (covers on an existing run still count).
