@@ -1203,7 +1203,7 @@ function validationProblems(){
   let r=0, d=0; for (const it of job.items) { if (it.type==='run' && !it.existing && !(it.len>0)) r++; if (it.type==='ds') { const miss=[]; if(!it.size) miss.push('size'); if(!it.story) miss.push('story'); if(it.status!=='reuse' && (!it.seq || !it.seq.length)) miss.push('elbow sequence'); if(!it.term) miss.push('termination'); if (miss.length) d++; } }
   if (r) probs.push(`${r} gutter run${r>1?'s':''} with no length (shown in red)`);
   if (d) probs.push(`${d} downspout${d>1?'s':''} missing size / story / elbows / termination (shown in red)`);
-  if (!job.items.some(i=>i.type==='run' && !i.existing)) probs.push('No new gutter runs on the drawing');
+  if (!job.items.length) probs.push('The drawing is empty');   // repair-only jobs (no new gutter) are allowed
   return probs;
 }
 function validationWarnings(){

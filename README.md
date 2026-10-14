@@ -31,6 +31,8 @@ Keep it that way. No customer data, exports, credentials or other files belong i
 
 ## Version history
 
+- **v3.3.1** (2026-10-14) — **Repair-only jobs export**: removed the "No new gutter runs on the drawing" block, so a job with only existing gutter, downspouts, accessories or callouts can export; an empty drawing is still blocked.
+
 - **v3.3** (2026-10-14) — **Text callouts**: new "To lower roof" preset (alongside Tie-in / Tear out / Reuse existing DS); the note box is now 4 rows tall for typing or writing with the Pencil (up to 200 characters, line breaks kept and stacked on the drawing). Smooth square offsets confirmed not counted (custom-cut, same as v3.2).
 
 - **v3.2** (2026-10-14) — **Geocel counted automatically**: 1 tube per 3 miters (inside, outside, bay; rounded up); a job with no miters gets 1 tube per 20 end caps (minimum 1). Shown with its math next to hangers, and can be typed over. **Round downspouts**: A/B elbows on a 4" Round downspout count on their own "Round elbows (4\")" line (one part; A/B only tells the crew placement), and their offsets get "Round offsets" lines by size. **Smooth square**: elbows and offsets are custom-cut from downspout stock, so they are not counted. Drawing labels unchanged.
