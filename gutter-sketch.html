@@ -101,6 +101,7 @@ body.full #contBar{bottom:16px}
 .mt{width:100%;border-collapse:collapse;font-size:14px}
 .mt td{padding:4px 6px;border-bottom:1px solid #e3d6a3}
 .mt td:last-child{text-align:right;font-weight:700;white-space:nowrap}
+.mt .hl{cursor:pointer;text-decoration:underline dotted}.mt .hl small{font-size:10px;color:#555;font-weight:400}.mt .hl.on{color:var(--red);font-weight:800}
 .mt tr.sub td{font-size:12px;color:#444;padding-left:18px}
 .mt input{width:110px;min-height:40px;border:1px solid var(--navy);border-radius:6px;padding:0 8px;background:#fff;text-align:right}
 .mfields{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;font-size:13px}
@@ -517,27 +518,52 @@ const CK = (x,y) => `${Math.round(x)},${Math.round(y)}`;
 // Resolve 'auto' run ends: a shared endpoint is a miter (inside/outside from the house shape), a loose end is an end cap.
 function resolveEnds(){
   const runs = job.items.filter(i => i.type==='run' && !i.existing);
-  const ends = []; runs.forEach(r => { ends.push({r, e:1, x:r.x1, y:r.y1}); ends.push({r, e:2, x:r.x2, y:r.y2}); });
   const res = new Map(); runs.forEach(r => res.set(r.id, {l: (!r.lend||r.lend==='auto') ? 'endcap' : r.lend, r: (!r.rend||r.rend==='auto') ? 'endcap' : r.rend}));
-  const corners = []; const used = new Set();
-  for (let i=0;i<ends.length;i++){ if (used.has(i)) continue; const grp=[i]; for (let j=i+1;j<ends.length;j++) if (!used.has(j) && dist(ends[i].x,ends[i].y,ends[j].x,ends[j].y) < 3) grp.push(j); grp.forEach(k=>used.add(k)); if (grp.length>=2) corners.push({x:ends[i].x, y:ends[i].y, ends: grp.map(k=>ends[k])}); }
-  let cx=0, cy=0; ends.forEach(e => { cx+=e.x; cy+=e.y; }); cx/=(ends.length||1); cy/=(ends.length||1);
-  const out = [];
-  for (const c of corners) {
-    const key = CK(c.x,c.y); let kind = job.corners[key] || null, auto = !kind;
-    if (!kind) {
-      const dirs = c.ends.slice(0,2).map(e => { const r=e.r, ox = e.e===1? r.x2 : r.x1, oy = e.e===1? r.y2 : r.y1, L = dist(c.x,c.y,ox,oy)||1; return [(ox-c.x)/L, (oy-c.y)/L]; });
-      const bx = dirs[0][0]+dirs[1][0], by = dirs[0][1]+dirs[1][1], bl = Math.hypot(bx,by);
-      if (bl < 0.25) kind = 'seam';                                   // straight joint between two runs
-      else { // bisector points into the corner's angle; if the house (drawing centroid) is in there, it's an outside corner
-        const dot = (bx/bl)*(cx-c.x) + (by/bl)*(cy-c.y); kind = dot > 0 ? 'miter_out' : 'miter_in'; }
-    }
-    out.push({key, x:c.x, y:c.y, kind, auto, groups: [...new Set(c.ends.map(e => e.r.g||0))]});
-    for (const e of c.ends) { const rec = res.get(e.r.id); const manual = e.e===1 ? e.r.lend : e.r.rend; if (!manual || manual==='auto') { if (e.e===1) rec.l = kind; else rec.r = kind; } }
+  // 1. cluster run endpoints into nodes (shared endpoint = corner)
+  const nodes = []; const nodeOf = new Map();   // "runId:1|2" -> node
+  const findNode = (x,y) => nodes.find(n => dist(n.x,n.y,x,y) < 3);
+  for (const r of runs) for (const e of [1,2]) { const x = e===1?r.x1:r.x2, y = e===1?r.y1:r.y2; let n = findNode(x,y); if (!n) { n = {x,y,ends:[]}; nodes.push(n); } n.ends.push({r,e}); nodeOf.set(r.id+':'+e, n); }
+  // 2. walk chains of runs through 2-way nodes to learn which side the house is on
+  const visited = new Set(); const sideOfRun = new Map();  // runId -> +1 / -1 (sign of cross product that means "toward the house")
+  const other = (r,e) => e===1 ? nodeOf.get(r.id+':2') : nodeOf.get(r.id+':1');
+  for (const r0 of runs) { if (visited.has(r0.id)) continue;
+    // extend backwards to a chain start (node with != 2 ends), or anywhere on a loop
+    let r = r0, e = 1, guard = 0; while (guard++ < 500) { const n = nodeOf.get(r.id+':'+e); if (n.ends.length !== 2) break; const nx = n.ends.find(q => q.r !== r); if (!nx || nx.r === r0) break; r = nx.r; e = nx.e === 1 ? 2 : 1; if (r === r0) break; }
+    // now walk forward collecting ordered points
+    const chain = []; const pts = []; let cur = r, ce = e; guard = 0;
+    while (cur && !visited.has(cur.id) && guard++ < 500) { visited.add(cur.id); chain.push(cur); const sn = nodeOf.get(cur.id+':'+ce), en = other(cur, ce); if (!pts.length) pts.push([sn.x,sn.y]); pts.push([en.x,en.y]);
+      if (en.ends.length !== 2) break; const nx = en.ends.find(q => q.r !== cur); if (!nx) break; cur = nx.r; ce = nx.e; }
+    // signed area of the closed polyline: >0 means interior is to the LEFT of travel in screen coords (y down => flip)
+    let A = 0; for (let i=0;i<pts.length;i++){ const [x1,y1]=pts[i], [x2,y2]=pts[(i+1)%pts.length]; A += x1*y2 - x2*y1; }
+    let sign = A > 0 ? 1 : -1;
+    if (Math.abs(A) < 1 || pts.length < 3) { // straight-ish chain: fall back to the drawing centroid
+      let cx=0, cy=0; nodes.forEach(n => { cx+=n.x; cy+=n.y; }); cx/=nodes.length||1; cy/=nodes.length||1;
+      const [x1,y1]=pts[0], [x2,y2]=pts[pts.length-1]; const cr = (x2-x1)*(cy-y1) - (y2-y1)*(cx-x1); sign = cr > 0 ? 1 : -1; }
+    chain.forEach((cr, i) => sideOfRun.set(cr.id, sign));
+    // remember travel direction per run so turn direction can be computed consistently
+    let c2 = r, e2 = e; for (const cr of chain) { sideOfRun.set(cr.id+':dir', e2); const en = other(cr, e2); const nx = en.ends.find(q => q.r !== cr); if (nx) { e2 = nx.e; } }
   }
-  return {ends: res, corners: out};
+  // 3. classify each 2-way node
+  const corners = [];
+  for (const n of nodes) { if (n.ends.length < 2) continue;
+    const key = CK(n.x,n.y); let kind = job.corners[key] || null; const auto = !kind;
+    if (!kind) {
+      const [a,b2] = n.ends; const ra=a.r, rb=b2.r;
+      const dirA = sideOfRun.get(ra.id+':dir'); // 1 = travels from end1 to end2
+      // incoming vector along run A toward the node, outgoing along run B away from the node
+      const ax = n.x - (a.e===1 ? ra.x2 : ra.x1), ay = n.y - (a.e===1 ? ra.y2 : ra.y1);
+      const bx = (b2.e===1 ? rb.x2 : rb.x1) - n.x, by = (b2.e===1 ? rb.y2 : rb.y1) - n.y;
+      const cross = ax*by - ay*bx; const side = sideOfRun.get(ra.id) || 1;
+      // if run A is actually travelled toward this node in the chain order, the sign is as computed; otherwise flip
+      const travelledIn = (dirA===1 && a.e===2) || (dirA===2 && a.e===1); const s = travelledIn ? 1 : -1;
+      const L = Math.hypot(ax,ay)*Math.hypot(bx,by) || 1;
+      if (Math.abs(cross)/L < 0.2) kind = 'seam'; else kind = (cross*s*side > 0) ? 'miter_out' : 'miter_in';
+    }
+    corners.push({key, x:n.x, y:n.y, kind, auto, groups:[...new Set(n.ends.map(q => q.r.g||0))]});
+    for (const q of n.ends) { const rec = res.get(q.r.id); const manual = q.e===1 ? q.r.lend : q.r.rend; if (!manual || manual==='auto') { if (q.e===1) rec.l = kind; else rec.r = kind; } }
+  }
+  return {ends: res, corners};
 }
-
 // ---- label collision avoidance ----------------------------------------------------
 function rectSegDist(r, x1,y1,x2,y2){ // min distance from a segment to an axis-aligned rect (0 = touches/crosses)
   let best = Infinity; for (let i=0;i<=12;i++){ const t=i/12, px=x1+(x2-x1)*t, py=y1+(y2-y1)*t; const dx=Math.max(r.x-px, 0, px-(r.x+r.w)), dy=Math.max(r.y-py, 0, py-(r.y+r.h)); best=Math.min(best, Math.hypot(dx,dy)); } return best; }
@@ -686,7 +712,9 @@ function render(){
   const rs = resolveEnds();
   const o = {field:isField(), isSel: id => id===sel || multi.has(id), invalid: invalidSet(), highlightPin, ends: rs.ends, dom: dominantProfile(), placed: []};
   drawScene(p, o);
-  if (!o.field && tool==='select') for (const c of rs.corners) if (c.kind!=='seam') p.circle(c.x, c.y, 11, {color: c.auto ? 'rgba(0,23,56,0.25)' : GOLD, width:2});
+  if (!o.field && (tool==='select' || cornerHL)) for (const c of rs.corners) { if (c.kind==='seam') continue; const hit = cornerHL && (cornerHL==='all' || cornerHL===c.kind);
+    p.circle(c.x, c.y, hit?14:11, {color: hit ? RED : (c.auto ? 'rgba(0,23,56,0.25)' : GOLD), width: hit?3:2});
+    if (cornerHL) p.text(c.kind==='miter_in'?'IN':c.kind==='miter_out'?'OUT':'BAY', c.x, c.y-22, {size:10, bold:true, color:'#fff', bg: hit?RED:NAVY}); }
   drawPins(p, o);
   // previews
   if (runPreview) { p.line(runPreview.x1,runPreview.y1,runPreview.x2,runPreview.y2,{color:'#888',width:4,dash:[8,6]}); const L = Math.hypot(runPreview.x2-runPreview.x1, runPreview.y2-runPreview.y1); }
@@ -701,6 +729,8 @@ let toolSub = null;        // accessory/hazard subtype
 let sel = null;            // selected item id
 const multi = new Set();   // multi-select ids (Select tool with Multi on)
 let multiMode = false;
+let cornerHL = null;        // null | 'all' | 'miter_in' | 'miter_out' | 'miter_bay' — highlight corners from the material list
+let lastCornerTap = {key:null, t:0};
 let pendingStart = null;   // {x,y,fromLast}
 let lastEnd = null;        // end of last run drawn
 let lastTouch = null;      // last canvas point touched (photo pin location)
@@ -855,7 +885,11 @@ function handleTap(w, e){
     const hit = hitTest(w.x,w.y); if (hit) selectItem(hit); else { sel = null; if (!multiMode) multi.clear(); showProps(); render(); } return; }
   if (!tool) { const pin = hitPin(w.x,w.y); if (pin && !isField()) openPhotoViewer(pin.id); }
 }
-function cycleCorner(c){ // auto -> inside -> outside -> bay -> auto
+function cycleCorner(c){
+  const now = performance.now(); const dbl = lastCornerTap.key===c.key && now - lastCornerTap.t < 450; lastCornerTap = {key:c.key, t:now};
+  if (!dbl) { toast(`Corner: ${endLabel(c.kind)}${c.auto?' (auto)':''} — double-tap to change`); return; }
+  lastCornerTap = {key:null, t:0};
+  // auto -> the opposite miter -> bay -> back to auto
   // auto -> the opposite miter -> bay -> back to auto
   const cur = job.corners[c.key]; let next;
   if (!cur) next = c.kind==='miter_in' ? 'miter_out' : 'miter_in'; else if (cur==='miter_bay') next = null; else next = 'miter_bay';
@@ -1178,7 +1212,8 @@ function renderMaterials(){
   if (m.sgLF) html += `<tr class="sub"><td>&nbsp;&nbsp;incl. ${SPLASH_GUARD_LF}' × ${m.acc.splashguard} splash guard${m.acc.splashguard>1?'s':''}</td><td>${fmtLF(m.sgLF)}</td></tr>`;
   html += row('Gutter covers', fmtLF(m.coverLF), mm => mm.coverLF ? fmtLF(mm.coverLF) : '');
   html += row('End caps', m.endcaps, mm => mm.endcaps||'');
-  html += row('Miters — inside', m.miterIn, mm => mm.miterIn||'') + row('Miters — outside', m.miterOut, mm => mm.miterOut||'') + row('Miters — bay', m.miterBay, mm => mm.miterBay||'');
+  const mrow = (kind, label, v, fn) => row(`<span class="hl ${cornerHL===kind?'on':''}" data-hl="${kind}">${label} <small>${cornerHL===kind?'▣ shown on drawing — tap to hide':'◻ tap to show on drawing'}</small></span>`, v, fn);
+  html += mrow('miter_in','Miters — inside', m.miterIn, mm => mm.miterIn||'') + mrow('miter_out','Miters — outside', m.miterOut, mm => mm.miterOut||'') + mrow('miter_bay','Miters — bay', m.miterBay, mm => mm.miterBay||'');
   html += row('Downspouts (new)', m.ds, mm => mm.ds||'');
   if (m.dsReuse) html += `<tr class="sub"><td>&nbsp;&nbsp;existing — reuse (not counted)</td><td>${m.dsReuse}</td></tr>`;
   for (const s of Object.keys(m.dsBySize)) html += `<tr class="sub"><td>&nbsp;&nbsp;${esc(s)}</td><td>${m.dsBySize[s]}</td></tr>`;
@@ -1192,6 +1227,7 @@ function renderMaterials(){
   html += row('Splash guards', m.acc.splashguard, mm => mm.acc.splashguard||'') + row('Splash blocks', m.acc.splashblock, mm => mm.acc.splashblock||'') + row('Rain chains', m.acc.rainchain + m.rainchainTerm, mm => (mm.acc.rainchain+mm.rainchainTerm)||'') + row('Drip edge extension', m.de ? 'Yes' : 'No', mm => mm.de ? 'Yes' : '');
   html += `</table>`;
   $('#mAuto').innerHTML = html;
+  $$('#mAuto [data-hl]').forEach(el => el.addEventListener('click', () => { cornerHL = cornerHL===el.dataset.hl ? null : el.dataset.hl; renderMaterials(); render(); }));
   $('#strapOv').addEventListener('change', e => { const v = e.target.value.trim(); if (v==='') delete job.manual.straps[strapKey]; else job.manual.straps[strapKey] = +v; touch(); });
   $('#hangerOv').addEventListener('change', e => { const v = e.target.value.trim(); if (v==='') delete job.manual.hangerOv[strapKey]; else job.manual.hangerOv[strapKey] = +v; touch(); });
   const mn = job.manual;
