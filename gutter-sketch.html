@@ -250,6 +250,7 @@ body.full #contBar{bottom:68px;z-index:9}
               <button class="btn" data-tool="haz" data-sub="pool">Pool</button>
               <button class="btn" data-tool="haz" data-sub="dish">Sat. Dish</button>
               <button class="btn" data-tool="haz" data-sub="chimney">Chimney</button>
+              <button class="btn" data-tool="haz" data-sub="tree">Tree</button>
               <button class="btn" data-tool="haz" data-sub="power">Power Line</button>
               <button class="btn" data-tool="haz" data-sub="landscape">Landscaping</button>
               <button class="btn wide" data-tool="haz" data-sub="warn">⚠ Warning</button>
@@ -364,7 +365,7 @@ const DS_SIZES = ['3×4"','4" Round','4×5"','2×3"','Smooth Square'];          
 const DS_SIZE_MAP = {'3x4':'3×4"','4" round':'4" Round','4x5':'4×5"','square':'Smooth Square'};
 const TERMS = [['splashblock','Splash block'],['drain','Drain'],['driveway','Driveway'],['rainchain','Rain chain'],['other','Other']];
 const ACC = {splashguard:{n:'Splash guard',ab:'SG'}, splashblock:{n:'Splash block',ab:'SB'}, dropoutlet:{n:'Drop outlet',ab:'DO'}, offset:{n:'Offset / jog',ab:'OFF'}, dripedge:{n:'Drip edge ext.',ab:'DE'}, rainchain:{n:'Rain chain',ab:'RC'}};
-const HAZ = {ac:{n:'AC unit',ab:'AC'}, pool:{n:'Pool',ab:'POOL'}, dish:{n:'Satellite dish',ab:'SAT'}, chimney:{n:'Chimney',ab:'CHIM'}, septic:{n:'Septic / well',ab:'SEP'}, power:{n:'Power line',ab:'PWR'}, landscape:{n:'Landscaping',ab:'LS'}, warn:{n:'Warning',ab:'!'}};
+const HAZ = {ac:{n:'AC unit',ab:'AC'}, pool:{n:'Pool',ab:'POOL'}, dish:{n:'Satellite dish',ab:'SAT'}, chimney:{n:'Chimney',ab:'CHIM'}, tree:{n:'Tree',ab:'TREE'}, septic:{n:'Septic / well',ab:'SEP'}, power:{n:'Power line',ab:'PWR'}, landscape:{n:'Landscaping',ab:'LS'}, warn:{n:'Warning',ab:'!'}};
 
 /* ---------------- storage ---------------- */
 const LS_KEY = 'gs_store_v1';
@@ -715,6 +716,7 @@ function drawHaz(p, h, o){
   const col = o.field ? '#000' : RED;
   if (o.isSel(h.id)) p.circle(h.x,h.y,19,{fill:GOLD});
   if (h.sub==='warn') { p.poly([[h.x,h.y-13],[h.x+13,h.y+10],[h.x-13,h.y+10]],{fill:'#fff',color:col,width:3,close:true}); p.text('!', h.x, h.y+2, {size:14, bold:true, color:col}); }
+  else if (h.sub==='tree') { const tc = o.field ? '#000' : '#617040'; const pts=[]; for (let i=0;i<=84;i++){ const a=i/84*Math.PI*2, R=19 + 7*Math.abs(Math.sin(a*3.5)); pts.push([h.x+R*Math.cos(a), h.y+R*Math.sin(a)]); } p.poly(pts,{fill:o.field?'#fff':'#e8edd9', color:tc, width:2.5, close:true}); p.circle(h.x,h.y,4,{fill:tc}); p.text('TREE', h.x, h.y+36, {size:9, bold:true, color:tc, bg:'#fff'}); }   // top view of a canopy, olive green
   else if (h.sub==='chimney') { p.rect(h.x-16,h.y-14,32,28,{fill:'#fff',color:col,width:3}); [-5,3].forEach(dy=>p.line(h.x-16,h.y+dy,h.x+16,h.y+dy,{color:col,width:1.2})); p.line(h.x,h.y-5,h.x,h.y+3,{color:col,width:1.2}); p.text('CHIMNEY', h.x, h.y+24, {size:9, bold:true, color:col, bg:'#fff'}); }   // brick box + label
   else if (h.sub==='pool') { p.circle(h.x,h.y,39,{fill:'#fff',color:col,width:4}); p.text('POOL', h.x, h.y, {size:18, bold:true, color:col}); }
   else { p.circle(h.x,h.y,13,{fill:'#fff',color:col,width:3}); p.text((HAZ[h.sub]||{ab:'?'}).ab, h.x, h.y, {size: (HAZ[h.sub]||{ab:'?'}).ab.length>2?7:10, bold:true, color:col}); }
@@ -841,7 +843,7 @@ function hitTest(x, y){
     if (it.type==='run') d = segDist(x,y,it.x1,it.y1,it.x2,it.y2);
     else if (it.type==='ink') { for (let k=1;k<it.pts.length;k++){ d=Math.min(d, segDist(x,y,it.pts[k-1][0],it.pts[k-1][1],it.pts[k][0],it.pts[k][1])); } }
     else if (it.type==='text') d = Math.min(dist(x,y,it.x,it.y)-10, dist(x,y,it.lx,it.ly), ...(it.ptrs||[]).map(q => dist(x,y,q[0],q[1])));
-    else d = dist(x,y,it.x,it.y) - ((it.type==='haz' && it.sub==='pool') ? 34 : 6);
+    else d = dist(x,y,it.x,it.y) - ((it.type==='haz' && it.sub==='pool') ? 34 : (it.type==='haz' && it.sub==='tree') ? 22 : 6);
     if (d < bd) { bd = d; best = it; }
   }
   return best;
