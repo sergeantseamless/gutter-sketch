@@ -31,6 +31,8 @@ Keep it that way. No customer data, exports, credentials or other files belong i
 
 ## Version history
 
+- **v3.5.2** (2026-10-15) — Tree marker shrunk to the same size as the landscaping / AC hazard circles.
+
 - **v3.5.1** (2026-10-15) — **Tree** marker added to Hazards / Attention (olive-green canopy, top view, labeled TREE; drag to place like the pool or chimney).
 
 - **v3.5** (2026-10-15) — **Termination starts blank** (no more default splash block); it is optional, tap the chosen button again to clear it, and whatever you pick prints on the downspout label (e.g. "AB · DRAIN"); a splash block is only counted when picked. **One callout, many pointers**: select a note, drag from the gold **+** on its box to each spot (double-tap a pointer end to remove it); all pointers print on the exports. **STANDING AT: Front / Right / Back / Left** button (Field Mode top bar and Full Mode toolbar) turns only the drawing on screen so you can keep the iPad upright — buttons never flip, text stays readable, a STREET arrow shows which way the front is, and exports always print street-side down. **Wedges check**: wedges now start at "— select —" and export warns "Wedges not selected" (Go back / Export anyway) like the color check; jobs already saved with None are unchanged. **Option 1 labels readable**: yellow-group text now prints navy on a gold label instead of yellow on white. **Continue-from-last-run bar** moved up so the Material List bar no longer covers it. **Drip edge extension** now appears in the auto legend when any run has it (run line with the thin line beside it). Also: in Field Mode, drawing a run with a Pencil drag no longer opens the number pad either (matches tap-to-draw from v3.4).
