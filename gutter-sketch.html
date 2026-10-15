@@ -554,8 +554,8 @@ function runLabel(r, dom){
 }
 const CK = (x,y) => `${Math.round(x)},${Math.round(y)}`;
 // Resolve 'auto' run ends: a shared endpoint is a miter (inside/outside from the house shape), a loose end is an end cap.
-function resolveEnds(){
-  const runs = job.items.filter(i => i.type==='run');   // existing runs take part in corner detection (tie-ins) but get no end marks
+function resolveEnds(onlyGroups){   // onlyGroups: optional Set of group numbers — resolve corners as if only those runs existed
+  const runs = job.items.filter(i => i.type==='run' && (!onlyGroups || onlyGroups.has(i.g||0)));   // existing runs take part in corner detection (tie-ins) but get no end marks
   const res = new Map(); runs.forEach(r => res.set(r.id, r.existing ? {l:'none', r:'none'} : {l: (!r.lend||r.lend==='auto') ? 'endcap' : r.lend, r: (!r.rend||r.rend==='auto') ? 'endcap' : r.rend}));
   // 1. cluster run endpoints into nodes (shared endpoint = corner)
   const nodes = []; const nodeOf = new Map();   // "runId:1|2" -> node
@@ -1268,7 +1268,7 @@ function validationWarnings(){
 let matTab = 'all';
 function activeGroups(){ const s = new Set(job.items.filter(i=>i.type!=='haz').map(i=>i.g||0)); return [...s].sort(); }
 function computeMaterials(gFilter, rs, noOv){ // gFilter: 'all' or group index; rs = resolveEnds() (optional)
-  rs = rs || resolveEnds();
+  rs = gFilter==='all' ? (rs || resolveEnds()) : resolveEnds(new Set([0, +gFilter]));   // Base = base runs only; an option = base + that option (its corners onto the base count as miters)
   const inG = it => gFilter==='all' || (it.g||0)===+gFilter;
   const items = job.items.filter(i => inG(i) && !(i.type==='run' && i.existing));
   const m = {gutter:{}, coverLF:0, sgLF:0, newLF:0, hangers:0, endcaps:0, endcapL:0, endcapR:0, miterIn:0, miterOut:0, miterBay:0, miterBayIn:0, miterBayOut:0, ds:0, dsReuse:0, dsBySize:{}, dsByStory:{}, elbA:0, elbB:0, offsets:{'2"':0,'4"':0,'6"':0}, outlets:0, straps:0, acc:{splashguard:0,splashblock:0,dropoutlet:0,offset:0,dripedge:0,rainchain:0}, rainchainTerm:0, sbTerm:0, dsPieces:0, dsPiecesBySize:{}, dsExt:0, cb:0, elbRound:0, offRound:{'2"':0,'4"':0,'6"':0}};
