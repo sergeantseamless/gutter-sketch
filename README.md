@@ -31,6 +31,8 @@ Keep it that way. No customer data, exports, credentials or other files belong i
 
 ## Version history
 
+- **v3.6** (2026-10-15) — **Collector box** on the downspout sheet ("Collector box on top: No / Yes"): drawn as a funnel box on top of the downspout square, label starts with CB (e.g. "CB 2\" 2\" 1.5st · DRAIN"); elbows/offsets are whatever you tap (none required when there is a collector box); counted on a new "Collector boxes" material line and in the legend; its downspout is NOT counted as a gutter outlet (the outlet is part of the collector box). The Special-order collector box field is now a size / color note. **Extension** added to the termination buttons (label shows "· EXTENSION"), counted on a new "Downspout extensions" line. Both lines can be typed over.
+
 - **v3.5.2** (2026-10-15) — Tree marker shrunk to the same size as the landscaping / AC hazard circles.
 
 - **v3.5.1** (2026-10-15) — **Tree** marker added to Hazards / Attention (olive-green canopy, top view, labeled TREE; drag to place like the pool or chimney).
