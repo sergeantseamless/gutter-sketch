@@ -46,7 +46,7 @@ body.field #fullUI{display:none}
 
 /* continue bar (both modes) */
 #contBar{position:absolute;left:50%;transform:translateX(-50%);bottom:130px;display:flex;gap:10px;align-items:center;background:var(--cream);border:3px solid var(--navy);border-radius:14px;padding:8px 8px 8px 16px;font-weight:700;font-size:17px;z-index:5}
-body.full #contBar{bottom:16px}
+body.full #contBar{bottom:68px;z-index:9}
 #contBar .btn{min-height:56px}
 
 /* ---------- FULL MODE ---------- */
@@ -169,6 +169,7 @@ body.full #contBar{bottom:16px}
       <button class="btn ghost" id="fJobs">JOBS</button>
       <button class="btn ghost" id="fExist">EXISTING</button>
       <button class="btn ghost" id="fLen">LENGTHS</button>
+      <button class="btn ghost standBtn" id="fStand">STANDING AT: FRONT</button>
       <span class="spacer"></span>
       <button class="btn gold" id="fFinish">FINISH IN TRUCK ▸</button>
     </div>
@@ -203,6 +204,7 @@ body.full #contBar{bottom:16px}
       <button class="btn" id="tMulti" title="Select several items at once">Multi</button>
       <button class="btn" id="tPan" data-tool="pan">Pan/Zoom</button>
       <button class="btn ghost" id="tField">◂ Field Mode</button>
+      <button class="btn ghost standBtn" id="tStand" title="Turn the drawing to match the side of the house you are standing at">STANDING AT: FRONT</button>
       <span class="grow"></span>
       <button class="btn ghost" id="tBg">Background</button>
       <button class="btn ghost" id="tJobs">Jobs</button>
@@ -413,8 +415,8 @@ function newJob(){
   return { id: uid(), customer:'', address:'', date: todayISO(), quote:'', prep: localStorage.getItem('gs_prep') || '',
     items: [], photos: [], photoSeq: 0,
     bg: {type:'grid', rot:0, imgId:null, w:0, h:0},
-    manual: {gutterColor:'', gutterCustom:'', dsColor:'', dsCustom:'', wedges:'none', coverType:'', hangerOv:{}, rcKitOv:{}, geocelOv:{}, ovr:{}, flexPipes:'', geocel:'', screws:'', poDelivery:'', fascia:'', soffit:'', jchannel:'', collectorBox:'', misc:'', notes:'', straps:{}}, corners:{}, v:4,
-    defaults: {profile:'6" K', cover:false, story:1, lend:'auto', rend:'auto', dsSize:'3×4"', dsStory:1, dsTerm:'splashblock', group:0},
+    manual: {gutterColor:'', gutterCustom:'', dsColor:'', dsCustom:'', wedges:'', coverType:'', hangerOv:{}, rcKitOv:{}, geocelOv:{}, ovr:{}, flexPipes:'', geocel:'', screws:'', poDelivery:'', fascia:'', soffit:'', jchannel:'', collectorBox:'', misc:'', notes:'', straps:{}}, corners:{}, v:4,
+    defaults: {profile:'6" K', cover:false, story:1, lend:'auto', rend:'auto', dsSize:'3×4"', dsStory:1, dsTerm:'', group:0},
     view: {tx:80, ty:140, s:1}, mode:'field', created: Date.now(), updated: Date.now() };
 }
 let job = null;
@@ -437,7 +439,7 @@ function openJob(id){
   if (job.v < 3) { // v2 -> v3: Jobber-aligned profile/size names, wedges replace hanger type, zip screws gone
     for (const it of job.items) { if (it.type==='run' && PROFILE_MAP[it.profile]) it.profile = PROFILE_MAP[it.profile]; if (it.type==='ds' && DS_SIZE_MAP[it.size]) it.size = DS_SIZE_MAP[it.size]; }
     if (PROFILE_MAP[job.defaults.profile]) job.defaults.profile = PROFILE_MAP[job.defaults.profile]; if (DS_SIZE_MAP[job.defaults.dsSize]) job.defaults.dsSize = DS_SIZE_MAP[job.defaults.dsSize];
-    const mn = job.manual; mn.wedges ||= 'none'; mn.hangerOv ||= {}; mn.geocelOv ||= {}; mn.ovr ||= {}; if (mn.geocel!=='' && mn.geocel!=null && mn.geocelOv.all===undefined) { mn.geocelOv.all = +mn.geocel; } mn.geocel = ''; mn.gutterCustom ||= ''; mn.dsCustom ||= ''; delete mn.hangerType; delete mn.hangerQty; delete mn.zipScrews; delete mn.sprayPaint; delete mn.offsets;
+    const mn = job.manual; if (mn.wedges===undefined) mn.wedges = 'none'; mn.hangerOv ||= {}; mn.geocelOv ||= {}; mn.ovr ||= {}; if (mn.geocel!=='' && mn.geocel!=null && mn.geocelOv.all===undefined) { mn.geocelOv.all = +mn.geocel; } mn.geocel = ''; mn.gutterCustom ||= ''; mn.dsCustom ||= ''; delete mn.hangerType; delete mn.hangerQty; delete mn.zipScrews; delete mn.sprayPaint; delete mn.offsets;
     if (mn.gutterColor && !COLORS.includes(mn.gutterColor)) { mn.gutterCustom = mn.gutterColor; mn.gutterColor = 'custom'; } if (mn.dsColor && !COLORS.includes(mn.dsColor)) { mn.dsCustom = mn.dsColor; mn.dsColor = 'custom'; }
     job.v = 3;
   }
@@ -495,18 +497,25 @@ const cv = $('#cv'), ctx = cv.getContext('2d');
 let W = 0, H = 0, dpr = 1;
 function resize(){ dpr = Math.min(window.devicePixelRatio || 1, 3); const r = $('#stage').getBoundingClientRect(); W = r.width; H = r.height; cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr); cv.style.width = W+'px'; cv.style.height = H+'px'; render(); }
 window.addEventListener('resize', () => setTimeout(resize, 50));
-const toWorld = (sx, sy) => ({x: (sx - job.view.tx)/job.view.s, y: (sy - job.view.ty)/job.view.s});
-const toScreen = (wx, wy) => ({x: wx*job.view.s + job.view.tx, y: wy*job.view.s + job.view.ty});
+// view rotation (quarter turns, clockwise) — screen only; saved drawing and exports stay street-side down
+const VROT = () => ((job.view.rot||0)%4+4)%4;
+const rotV = (x, y, q) => q===1 ? [-y, x] : q===2 ? [-x, -y] : q===3 ? [y, -x] : [x, y];
+const toWorld = (sx, sy) => { const [x,y] = rotV(sx - job.view.tx, sy - job.view.ty, (4-VROT())%4); return {x: x/job.view.s, y: y/job.view.s}; };
+const toScreen = (wx, wy) => { const [x,y] = rotV(wx*job.view.s, wy*job.view.s, VROT()); return {x: x + job.view.tx, y: y + job.view.ty}; };
+function keepPoint(wx, wy, sx, sy, s){ job.view.s = s; const [x,y] = rotV(wx*s, wy*s, VROT()); job.view.tx = sx - x; job.view.ty = sy - y; }   // zoom/rotate around a world point
+const STAND = ['Front','Right','Back','Left'];
+function setStand(q){ const c = toWorld(W/2, H/2); job.view.rot = q; keepPoint(c.x, c.y, W/2, H/2, job.view.s); $$('.standBtn').forEach(b => b.textContent = 'STANDING AT: ' + STAND[q].toUpperCase()); touch(); render(); }
 const isField = () => document.body.classList.contains('field');
 
 /* ---------------- painter abstraction (canvas + pdf share the same scene code) ---------------- */
-function canvasPainter(c){
+function canvasPainter(c, vq){   // vq = on-screen view rotation in quarter turns (text is kept upright for the reader)
+  vq = vq || 0;
   return {
     line(x1,y1,x2,y2,o={}){ c.save(); c.strokeStyle=o.color||NAVY; c.lineWidth=o.width||3; c.lineCap='round'; c.lineJoin='round'; c.setLineDash(o.dash||[]); c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2); c.stroke(); c.restore(); },
     poly(pts,o={}){ if(pts.length<2&&!o.fill) return; c.save(); c.lineWidth=o.width||3; c.lineCap='round'; c.lineJoin='round'; c.setLineDash(o.dash||[]); c.beginPath(); c.moveTo(pts[0][0],pts[0][1]); for(let i=1;i<pts.length;i++) c.lineTo(pts[i][0],pts[i][1]); if(o.close) c.closePath(); if(o.fill){ c.fillStyle=o.fill; c.fill(); } if(o.color){ c.strokeStyle=o.color; c.stroke(); } c.restore(); },
     rect(x,y,w,h,o={}){ c.save(); if(o.fill){ c.fillStyle=o.fill; c.fillRect(x,y,w,h); } if(o.color){ c.strokeStyle=o.color; c.lineWidth=o.width||2; c.strokeRect(x,y,w,h); } c.restore(); },
     circle(x,y,r,o={}){ c.save(); c.beginPath(); c.arc(x,y,r,0,Math.PI*2); if(o.fill){ c.fillStyle=o.fill; c.fill(); } if(o.color){ c.strokeStyle=o.color; c.lineWidth=o.width||2; c.stroke(); } c.restore(); },
-    text(str,x,y,o={}){ c.save(); const size=o.size||12; c.font=`${o.bold?'700':'500'} ${size}px -apple-system,Helvetica,Arial,sans-serif`; c.textAlign=o.align||'center'; c.textBaseline='middle'; c.translate(x,y); if(o.angle) c.rotate(o.angle);
+    text(str,x,y,o={}){ if (o.color && String(o.color).toUpperCase()===GOLD && (o.bg==='#fff' || !o.bg)) { o = {...o, color:NAVY, bg:GOLD, bgStroke:NAVY}; }   /* Option 1: gold-on-white is unreadable — navy on a gold label */ c.save(); const size=o.size||12; c.font=`${o.bold?'700':'500'} ${size}px -apple-system,Helvetica,Arial,sans-serif`; c.textAlign=o.align||'center'; c.textBaseline='middle'; c.translate(x,y); { let a = o.angle||0; if (vq) { const R = vq*Math.PI/2; if (o.angle===undefined) a = -R; else { let sa = a + R; sa = Math.atan2(Math.sin(sa), Math.cos(sa)); if (sa >= Math.PI/2 - 1e-6) sa -= Math.PI; else if (sa < -Math.PI/2 - 1e-6) sa += Math.PI; a = sa - R; } } if (a) c.rotate(a); }
       if(o.bg){ const w=c.measureText(str).width+size*0.7, h=size*1.35; const bx = o.align==='left'?-size*0.35:(o.align==='right'?-w+size*0.35:-w/2); c.fillStyle=o.bg; c.beginPath(); c.roundRect? c.roundRect(bx,-h/2,w,h,3): c.rect(bx,-h/2,w,h); c.fill(); if(o.bgStroke){ c.strokeStyle=o.bgStroke; c.lineWidth=1.2; c.stroke(); } }
       c.fillStyle=o.color||NAVY; c.fillText(str,0,0); c.restore(); },
     image(img,x,y,w,h,rot){ c.save(); c.translate(x+w/2,y+h/2); c.rotate((rot||0)*Math.PI/2); c.drawImage(img,-w/2,-h/2,w,h); c.restore(); }
@@ -522,7 +531,7 @@ function pdfPainter(doc, ox, oy, bx, by, k){
     poly(pts,o={}){ if(pts.length<2) return; setStroke(o.color||NAVY,o.width,o.dash); if(o.fill) doc.setFillColor(...rgb(o.fill)); const p=pts.map(q=>[X(q[0]),Y(q[1])]); const segs=[]; for(let i=1;i<p.length;i++) segs.push([p[i][0]-p[i-1][0], p[i][1]-p[i-1][1]]); const style = o.fill && o.color ? 'FD' : (o.fill ? 'F' : 'S'); doc.lines(segs, p[0][0], p[0][1], [1,1], style, !!o.close); doc.setLineDashPattern([],0); },
     rect(x,y,w,h,o={}){ if(o.fill) doc.setFillColor(...rgb(o.fill)); if(o.color) setStroke(o.color,o.width||2); doc.rect(X(x),Y(y),w*k,h*k, o.fill&&o.color?'FD':(o.fill?'F':'S')); },
     circle(x,y,r,o={}){ if(o.fill) doc.setFillColor(...rgb(o.fill)); if(o.color) setStroke(o.color,o.width||2); doc.circle(X(x),Y(y),r*k, o.fill&&o.color?'FD':(o.fill?'F':'S')); },
-    text(str,x,y,o={}){ const size=Math.max(5,(o.size||12)*k); doc.setFont('helvetica', o.bold?'bold':'normal'); doc.setFontSize(size);
+    text(str,x,y,o={}){ if (o.color && String(o.color).toUpperCase()===GOLD && (o.bg==='#fff' || !o.bg)) { o = {...o, color:NAVY, bg:GOLD, bgStroke:NAVY}; }   /* Option 1: gold-on-white is unreadable — navy on a gold label */ const size=Math.max(5,(o.size||12)*k); doc.setFont('helvetica', o.bold?'bold':'normal'); doc.setFontSize(size);
       const w=doc.getTextWidth(str), ang=o.angle||0, ca=Math.cos(ang), sa=Math.sin(ang), shift = o.align==='left'?0:(o.align==='right'?w:w/2);
       if(o.bg){ const bw=w+size*0.7, bh=size*1.35, bx0=-shift-size*0.35; const corners=[[bx0,-bh/2],[bx0+bw,-bh/2],[bx0+bw,bh/2],[bx0,bh/2]].map(([px,py])=>[X(x)+px*ca-py*sa, Y(y)+px*sa+py*ca]); doc.setFillColor(...rgb(o.bg)); if(o.bgStroke){ doc.setDrawColor(...rgb(o.bgStroke)); doc.setLineWidth(0.5); } const segs=[]; for(let i=1;i<4;i++) segs.push([corners[i][0]-corners[i-1][0], corners[i][1]-corners[i-1][1]]); doc.lines(segs, corners[0][0], corners[0][1], [1,1], o.bgStroke?'FD':'F', true); }
       // jsPDF applies align/baseline before rotation, so place the text start point by hand
@@ -673,7 +682,8 @@ function drawDS(p, d, o){
   const reuse = d.status==='reuse';
   if (reuse) { p.rect(d.x-s/2, d.y-s/2, s, s, {fill:'#fff', color:col, width:2.5}); p.line(d.x-s/2, d.y+s/2, d.x+s/2, d.y-s/2, {color:col, width:2}); }
   else p.rect(d.x-s/2, d.y-s/2, s, s, {fill:col, color: d.g===1?NAVY:undefined, width:1.5});
-  const l1 = reuse ? `REUSE ${d.story?dsStoryTag(d.story):''}`.trim() : `${seqText(d.seq)||'?'} ${d.story?dsStoryTag(d.story):'?'}`.trim();
+  const tt = d.term ? ' · ' + termLabel(d.term).toUpperCase() : '';   // termination shows only when one was picked
+  const l1 = (reuse ? `REUSE ${d.story?dsStoryTag(d.story):''}`.trim() : `${seqText(d.seq)||'?'} ${d.story?dsStoryTag(d.story):'?'}`.trim()) + tt;
   const s1 = field ? (reuse?13:14) : (reuse?10:11), l2 = (!field && !reuse && d.size && d.size!=='3×4"') ? d.size : null, s2 = 9;
   const w = Math.max(textW(l1, s1), l2 ? textW(l2, s2) : 0), h = s1*1.35 + (l2 ? s2*1.35 + 1 : 0);
   let cx, cy;
@@ -718,14 +728,18 @@ function drawInk(p, k, o){
   if (o.isSel(k.id)) p.poly(k.pts,{color:GOLD,width:(k.w||3)+8});
   p.poly(k.pts,{color: o.field?'#000':(k.color||'#000'), width:k.w||3});
 }
+const txtBox = new Map();   // note id -> box, for the + pointer handle
 function drawText(p, t, o){
   const col = o.field?'#000':groupColor(t.g,false);
   if (o.isSel(t.id)) p.circle(t.x,t.y,10,{fill:GOLD});
   p.line(t.lx,t.ly,t.x,t.y,{color:col,width:1.5});
   p.circle(t.lx,t.ly,3,{fill:col});
+  for (const q of (t.ptrs||[])) { p.line(q[0],q[1],t.x,t.y,{color:col,width:1.5}); p.circle(q[0],q[1],3,{fill:col}); }   // extra pointers from the same note
   const tl = String(t.text||'…').split(/\n+/).map(l=>l.trim()).filter(Boolean); if (!tl.length) tl.push('…');   // multi-line notes stack, centered on the callout point
   tl.forEach((l,i) => p.text(l, t.x, t.y + (i - (tl.length-1)/2)*16, {size:12, bold:true, color:col, bg:'#fff', bgStroke:col}));
-  if (o.isSel(t.id)) p.circle(t.lx,t.ly,7,{fill:'#fff',color:NAVY,width:2});
+  const bw = Math.max(...tl.map(l => textW(l, 12))), bh = tl.length*16 + 4; txtBox.set(t.id, {x:t.x, y:t.y, w:bw, h:bh});
+  if (o.isSel(t.id)) { p.circle(t.lx,t.ly,7,{fill:'#fff',color:NAVY,width:2}); for (const q of (t.ptrs||[])) p.circle(q[0],q[1],7,{fill:'#fff',color:NAVY,width:2});
+    if (!o.field) { const hx = t.x + bw/2 + 12, hy = t.y - bh/2 - 6; p.circle(hx, hy, 10, {fill:GOLD, color:NAVY, width:2}); p.text('+', hx, hy, {size:15, bold:true, color:NAVY}); } }
 }
 function drawScene(p, o){
   const order = ['ink','xrun','run','ds','acc','haz','tag','text'];
@@ -737,7 +751,7 @@ function drawPins(p, o){
   for (const ph of job.photos) { const hi = o.highlightPin===ph.id; p.circle(ph.x, ph.y, hi?15:10, {fill:GOLD, color:NAVY, width:hi?3:1.5}); p.text(String(ph.n), ph.x, ph.y, {size:hi?15:11, bold:true, color:NAVY}); }
 }
 function drawGrid(c){
-  const v=job.view; const x0=Math.floor((-v.tx/v.s)/GRID)*GRID, y0=Math.floor((-v.ty/v.s)/GRID)*GRID, x1=(W-v.tx)/v.s, y1=(H-v.ty)/v.s;
+  const v=job.view; const cs=[toWorld(0,0),toWorld(W,0),toWorld(0,H),toWorld(W,H)]; const x0=Math.floor(Math.min(...cs.map(q=>q.x))/GRID)*GRID, y0=Math.floor(Math.min(...cs.map(q=>q.y))/GRID)*GRID, x1=Math.max(...cs.map(q=>q.x)), y1=Math.max(...cs.map(q=>q.y));
   c.save(); c.lineWidth = 1/v.s;
   for (let x=x0; x<=x1; x+=GRID){ c.strokeStyle = (Math.round(x/GRID)%5===0)?'#c9ccd6':'#e6e8ee'; c.beginPath(); c.moveTo(x,y0); c.lineTo(x,y1); c.stroke(); }
   for (let y=y0; y<=y1; y+=GRID){ c.strokeStyle = (Math.round(y/GRID)%5===0)?'#c9ccd6':'#e6e8ee'; c.beginPath(); c.moveTo(x0,y); c.lineTo(x1,y); c.stroke(); }
@@ -746,10 +760,11 @@ function drawGrid(c){
 let highlightPin = null, inkPreview = null, runPreview = null, marquee = null;
 function render(){
   if (!job || !W) return;
+  { const lbl = 'STANDING AT: ' + STAND[VROT()].toUpperCase(); $$('.standBtn').forEach(b => { if (b.textContent!==lbl) b.textContent = lbl; b.classList.toggle('active', VROT()!==0); }); }
   ctx.setTransform(dpr,0,0,dpr,0,0); ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
-  const v = job.view; ctx.save(); ctx.translate(v.tx,v.ty); ctx.scale(v.s,v.s);
+  const v = job.view; ctx.save(); ctx.translate(v.tx,v.ty); ctx.rotate(VROT()*Math.PI/2); ctx.scale(v.s,v.s);
   if (job.bg.type==='image') { const rec = imgCache.get(job.bg.imgId); if (rec) canvasPainter(ctx).image(rec.img, job.bg.x||0, job.bg.y||0, job.bg.w, job.bg.h, job.bg.rot||0); else drawGrid(ctx); } else drawGrid(ctx);
-  const p = canvasPainter(ctx);
+  const p = canvasPainter(ctx, VROT());
   const rs = resolveEnds();
   const o = {field:isField(), isSel: id => id===sel || multi.has(id), invalid: invalidSet(), highlightPin, ends: rs.ends, dom: dominantProfile(), placed: []};
   drawScene(p, o);
@@ -763,6 +778,7 @@ function render(){
   if (pendingStart) { p.circle(pendingStart.x,pendingStart.y,9,{fill:GOLD,color:NAVY,width:2.5}); }
   if (inkPreview && inkPreview.length>1) p.poly(inkPreview,{color:inkColor,width:inkW});
   ctx.restore();
+  if (VROT()) { const [dx,dy] = rotV(0, 1, VROT()); const cx = W - 70, cy = isField() ? 170 : 110; ctx.save(); ctx.strokeStyle = NAVY; ctx.fillStyle = NAVY; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(cx - dx*18, cy - dy*18); ctx.lineTo(cx + dx*18, cy + dy*18); ctx.stroke(); ctx.beginPath(); ctx.moveTo(cx + dx*26, cy + dy*26); ctx.lineTo(cx + dx*14 - dy*8, cy + dy*14 + dx*8); ctx.lineTo(cx + dx*14 + dy*8, cy + dy*14 - dx*8); ctx.closePath(); ctx.fill(); ctx.font = '800 11px -apple-system,Helvetica,Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff'; const tx = cx + dx*44, ty = cy + dy*44; ctx.fillRect(tx-28, ty-9, 56, 18); ctx.fillStyle = NAVY; ctx.fillText('STREET', tx, ty); ctx.restore(); }   // which way the street is when the drawing is turned
 }
 
 /* ---------------- tool state ---------------- */
@@ -824,7 +840,7 @@ function hitTest(x, y){
   for (let i=job.items.length-1; i>=0; i--) { const it=job.items[i]; let d=Infinity;
     if (it.type==='run') d = segDist(x,y,it.x1,it.y1,it.x2,it.y2);
     else if (it.type==='ink') { for (let k=1;k<it.pts.length;k++){ d=Math.min(d, segDist(x,y,it.pts[k-1][0],it.pts[k-1][1],it.pts[k][0],it.pts[k][1])); } }
-    else if (it.type==='text') d = Math.min(dist(x,y,it.x,it.y)-10, dist(x,y,it.lx,it.ly));
+    else if (it.type==='text') d = Math.min(dist(x,y,it.x,it.y)-10, dist(x,y,it.lx,it.ly), ...(it.ptrs||[]).map(q => dist(x,y,q[0],q[1])));
     else d = dist(x,y,it.x,it.y) - ((it.type==='haz' && it.sub==='pool') ? 34 : 6);
     if (d < bd) { bd = d; best = it; }
   }
@@ -861,7 +877,9 @@ function beginGesture(w, e){
     if (it) { // endpoint / anchor handles first
       const hr = 14/job.view.s;
       if (it.type==='run') { if (dist(w.x,w.y,it.x1,it.y1)<hr) return {kind:'endpoint', it, end:1}; if (dist(w.x,w.y,it.x2,it.y2)<hr) return {kind:'endpoint', it, end:2}; }
-      if (it.type==='text' && dist(w.x,w.y,it.lx,it.ly)<hr) return {kind:'anchor', it};
+      if (it.type==='text') { const b = txtBox.get(it.id); if (b && dist(w.x,w.y, it.x + b.w/2 + 12, it.y - b.h/2 - 6) < hr) { snapshot(); (it.ptrs ||= []).push([w.x, w.y]); return {kind:'ptr', it, i: it.ptrs.length-1, isNew:true}; }
+        if (dist(w.x,w.y,it.lx,it.ly)<hr) return {kind:'anchor', it};
+        const pi = (it.ptrs||[]).findIndex(q => dist(w.x,w.y,q[0],q[1]) < hr); if (pi >= 0) return {kind:'ptr', it, i:pi}; }
       if (it.type==='ds') { const lp = dsLabelPos.get(it.id); if (lp && w.x > lp.x-lp.w/2-4 && w.x < lp.x+lp.w/2+4 && w.y > lp.y-lp.h/2-4 && w.y < lp.y+lp.h/2+4) return {kind:'dslabel', it}; }
     }
     const pin = hitPin(w.x,w.y); if (pin) return {kind:'pin', pin, ox:pin.x, oy:pin.y, start:w, snap:false};
@@ -882,13 +900,14 @@ cv.addEventListener('pointermove', e => {
   if (!gesture) return;
   if (gesture.kind==='pinch') { const arr=[...ptrs.values()]; if (arr.length<2) return; const [a,b]=arr; const d=dist(a.sx,a.sy,b.sx,b.sy); const mx=(a.sx+b.sx)/2, my=(a.sy+b.sy)/2; const s = clamp(gesture.v0.s * d/gesture.d0, 0.15, 8);
     // keep the world point under the initial midpoint fixed, then pan by midpoint delta
-    const wx=(gesture.mx-gesture.v0.tx)/gesture.v0.s, wy=(gesture.my-gesture.v0.ty)/gesture.v0.s; job.view.s=s; job.view.tx = mx - wx*s; job.view.ty = my - wy*s; render(); return; }
+    const sv = {...job.view}; Object.assign(job.view, gesture.v0); const w0 = toWorld(gesture.mx, gesture.my); Object.assign(job.view, sv); keepPoint(w0.x, w0.y, mx, my, s); render(); return; }
   if (gesture.kind==='pan') { if (!p.moved) return; job.view.tx = gesture.v0.tx + dxs; job.view.ty = gesture.v0.ty + dys; render(); return; }
   if (gesture.kind==='ink') { inkPreview.push([w.x,w.y]); render(); return; }
   if (gesture.kind==='marquee') { if (!p.moved) return; marquee = {x1:gesture.start.x, y1:gesture.start.y, x2:w.x, y2:w.y}; render(); return; }
   if (gesture.kind==='rundrag') { if (!p.moved) return; const s2 = snapPt(w.x,w.y); runPreview = {x1:gesture.start.x,y1:gesture.start.y,x2:s2.x,y2:s2.y}; render(); return; }
   if (gesture.kind==='move') { if (!p.moved) return; if (!gesture.snapped) { snapshot(); gesture.snapped = true; } const dx = w.x-gesture.start.x, dy = w.y-gesture.start.y; gesture.items.forEach((it,i) => moveItem(it, JSON.parse(gesture.origs[i]), dx, dy)); render(); return; }
   if (gesture.kind==='endpoint') { if (!p.moved) return; if (!gesture.snapped) { snapshot(); gesture.snapped = true; } const s2 = snapPt(w.x,w.y,gesture.it.id); if (gesture.end===1) { gesture.it.x1=s2.x; gesture.it.y1=s2.y; } else { gesture.it.x2=s2.x; gesture.it.y2=s2.y; } render(); return; }
+  if (gesture.kind==='ptr') { if (!p.moved) return; if (!gesture.snapped && !gesture.isNew) { snapshot(); gesture.snapped = true; } gesture.it.ptrs[gesture.i] = [w.x, w.y]; render(); return; }
   if (gesture.kind==='anchor') { if (!p.moved) return; if (!gesture.snapped) { snapshot(); gesture.snapped = true; } gesture.it.lx=w.x; gesture.it.ly=w.y; render(); return; }
   if (gesture.kind==='dslabel') { if (!p.moved) return; if (!gesture.snapped) { snapshot(); gesture.snapped = true; } gesture.it.lo = [Math.round(w.x-gesture.it.x), Math.round(w.y-gesture.it.y)]; render(); return; }
   if (gesture.kind==='pin') { if (!p.moved) return; gesture.pin.x = gesture.ox + (w.x-gesture.start.x); gesture.pin.y = gesture.oy + (w.y-gesture.start.y); render(); return; }
@@ -899,6 +918,7 @@ function moveItem(it, o, dx, dy){
   else if (it.type==='text') { it.x=o.x+dx; it.y=o.y+dy; }
   else { it.x=o.x+dx; it.y=o.y+dy; }
 }
+let lastPtrTap = {};
 function endPointer(e){
   const p = ptrs.get(e.pointerId); if (!p) return; ptrs.delete(e.pointerId); lastCanvasUp = performance.now();
   if (isPenLike(e)) { clearTimeout(penTimer); penTimer = setTimeout(() => penActive=false, 600); }
@@ -906,7 +926,8 @@ function endPointer(e){
   const g = gesture; if (ptrs.size===0) gesture = null; else if (g && g.kind==='pinch') { gesture = {kind:'pan', v0:{...job.view}}; const rem=[...ptrs.values()][0]; rem.x0=rem.sx; rem.y0=rem.sy; return; }
   if (!g) return;
   if (g.kind==='ink') { const pts = inkPreview; inkPreview = null; if (pts && pts.length>1) { snapshot(); job.items.push({type:'ink', id:uid(), g:curGroup, color:inkColor, w:inkW, pts: simplify(pts)}); afterItemsChanged(); } else render(); return; }
-  if (g.kind==='rundrag') { runPreview = null; if (p.moved) { const s2 = snapPt(w.x,w.y); if (dist(g.start.x,g.start.y,s2.x,s2.y) > 4) { openLengthPad(g.start, s2); return; } } else { tapRun(w); } render(); return; }
+  if (g.kind==='rundrag') { runPreview = null; if (p.moved) { const s2 = snapPt(w.x,w.y); if (dist(g.start.x,g.start.y,s2.x,s2.y) > 4) { if (isField()) { commitRun(g.start, s2, 0, isExistingTool()); updateHints(); return; } openLengthPad(g.start, s2); return; } } else { tapRun(w); } render(); return; }
+  if (g.kind==='ptr') { if (g.isNew && !p.moved) { g.it.ptrs.pop(); if (!g.it.ptrs.length) delete g.it.ptrs; toast('Drag from the + to the spot you want to point at'); render(); return; } if (!g.isNew && !p.moved && tap) { const now = performance.now(); if (lastPtrTap.id===g.it.id && lastPtrTap.i===g.i && now-lastPtrTap.t < 450) { snapshot(); g.it.ptrs.splice(g.i,1); if (!g.it.ptrs.length) delete g.it.ptrs; lastPtrTap = {}; afterItemsChanged(); showProps(); toast('Pointer removed'); return; } lastPtrTap = {id:g.it.id, i:g.i, t:now}; toast('Double-tap a pointer end to remove it'); return; } afterItemsChanged(); showProps(); return; }
   if (g.kind==='move' || g.kind==='endpoint' || g.kind==='anchor' || g.kind==='dslabel') { if (p.moved) { afterItemsChanged(); showProps(); } else if (g.kind==='move') { if (tap) selectItem(g.it); } return; }
   if (g.kind==='pin') { if (p.moved) { touch(); render(); } else if (tap) openPhotoViewer(g.pin.id); return; }
   if (g.kind==='corner') { if (tap) cycleCorner(g.corner); return; }
@@ -915,7 +936,7 @@ function endPointer(e){
 }
 cv.addEventListener('pointerup', endPointer);
 cv.addEventListener('pointercancel', e => { const p = ptrs.get(e.pointerId); ptrs.delete(e.pointerId); if (isPenLike(e)) { penTimer = setTimeout(()=>penActive=false, 600); } if (gesture && gesture.kind==='ink') inkPreview=null; if (gesture && gesture.kind==='rundrag') runPreview=null; if (ptrs.size===0) gesture=null; render(); });
-cv.addEventListener('wheel', e => { e.preventDefault(); const {sx,sy} = pointerPos(e); const f = Math.exp(-e.deltaY*0.0015); const s = clamp(job.view.s*f, 0.15, 8); const w = toWorld(sx,sy); job.view.s = s; job.view.tx = sx - w.x*s; job.view.ty = sy - w.y*s; render(); }, {passive:false});
+cv.addEventListener('wheel', e => { e.preventDefault(); const {sx,sy} = pointerPos(e); const f = Math.exp(-e.deltaY*0.0015); const s = clamp(job.view.s*f, 0.15, 8); const w = toWorld(sx,sy); keepPoint(w.x, w.y, sx, sy, s); render(); }, {passive:false});
 cv.addEventListener('contextmenu', e => e.preventDefault());
 function simplify(pts){ const out=[pts[0]]; for (const q of pts) { const l=out[out.length-1]; if (dist(l[0],l[1],q[0],q[1]) > 1.5) out.push([Math.round(q[0]*10)/10, Math.round(q[1]*10)/10]); } return out; }
 
@@ -984,7 +1005,7 @@ let sheetEl = null;
 function openSheet(html, opts={}){ closeSheet(); const ov = document.createElement('div'); ov.className='overlay'; ov.innerHTML = `<div class="sheet" style="${opts.style||''}">${html}</div>`; $('#sheets').appendChild(ov); sheetEl = ov;
   const openedAt = performance.now(), guard = (openedAt - lastCanvasUp) < 400; // swallow the "ghost click" the browser fires right after the canvas tap that opened this sheet
   ov.addEventListener('click', e => { if (guard && performance.now() - openedAt < 350) { e.stopPropagation(); e.preventDefault(); } }, true);
-  ov.addEventListener('click', e => { const b = e.target.closest('[data-seg] > button'); if (!b) return; b.parentElement.querySelectorAll('button').forEach(x => x.classList.remove('active')); b.classList.add('active'); });
+  ov.addEventListener('click', e => { const b = e.target.closest('[data-seg] > button'); if (!b) return; const was = b.classList.contains('active'); b.parentElement.querySelectorAll('button').forEach(x => x.classList.remove('active')); if (!(was && b.parentElement.dataset.clear)) b.classList.add('active'); });
   if (opts.dismiss!==false) ov.addEventListener('pointerdown', e => { if (e.target===ov && (!guard || performance.now() - openedAt > 350)) { closeSheet(); opts.onCancel && opts.onCancel(); } }); return ov; }
 function closeSheet(){ if (sheetEl) { sheetEl.remove(); sheetEl = null; } }
 function segHTML(name, opts, val, big){ return `<div class="seg ${big?'big':''}" data-seg="${name}">${opts.map(o => { const [v,l] = Array.isArray(o)?o:[o,o]; return `<button class="btn ${String(v)===String(val)?'active':''}" data-v="${esc(v)}">${esc(l)}</button>`; }).join('')}</div>`; }
@@ -1012,7 +1033,7 @@ function openLengthPad(start, end, existing){
 
 function openDsSheet(w, existing){
   const d = job.defaults; const field = isField();
-  const cur = existing || {size:d.dsSize, story:d.dsStory, seq:[], term:d.dsTerm, note:'', g:curGroup, status:'new'};
+  const cur = existing || {size:d.dsSize, story:d.dsStory, seq:[], term:'', note:'', g:curGroup, status:'new'};   // termination starts blank — nothing assumed
   let seq = Array.isArray(cur.seq) ? [...cur.seq] : [];
   const ov = openSheet(`<h3>${existing?'Edit downspout':'Downspout'}</h3>
     ${field?'':`<div class="row"><label class="l">Size</label>${segHTML('size', DS_SIZES, cur.size)}</div>`}
@@ -1021,7 +1042,7 @@ function openDsSheet(w, existing){
     <div class="row"><label class="l">Elbows &amp; offsets (tap in order, top to bottom)</label>
       <div class="seg big" id="seqKeys">${SEQ_TOKENS.map(t=>`<button class="btn" data-e="${esc(t)}">${esc(t)}</button>`).join('')}<button class="btn" data-e="bs">⌫</button></div>
       <div class="seqbox" id="seqBox">${esc(seqText(seq))}</div></div>
-    <div class="row"><label class="l">Termination</label>${segHTML('term', TERMS, cur.term, field)}</div>
+    <div class="row"><label class="l">Termination <span style="font-weight:400">(optional — tap again to clear)</span></label>${segHTML('term', TERMS, cur.term, field).replace('class="seg', 'data-clear="1" class="seg')}</div>
     ${field?'':`<div class="row"><label class="l">Note</label><input type="text" id="dsNote" value="${esc(cur.note||'')}" placeholder="optional"></div>
     <div class="row"><label class="l">Group</label>${segHTML('g', GROUPS.map((g,i)=>[i,g.n]), cur.g??0)}</div>`}
     <div class="actions"><button class="btn ghost" id="dsCancel">Cancel</button><button class="btn gold" id="dsDone">DONE</button></div>`, {onCancel:()=>render()});
@@ -1029,12 +1050,12 @@ function openDsSheet(w, existing){
   ov.querySelector('#seqKeys').addEventListener('click', e => { const b=e.target.closest('[data-e]'); if(!b) return; if (b.dataset.e==='bs') seq.pop(); else if (seq.length<12) seq.push(b.dataset.e); box.textContent = seqText(seq); });
   ov.querySelector('#dsCancel').onclick = () => { closeSheet(); render(); };
   ov.querySelector('#dsDone').onclick = () => {
-    const sv = segVal(ov,'story'); const story = sv==='LR' ? 'LR' : +sv; const size = field ? cur.size : segVal(ov,'size'); const term = segVal(ov,'term') || cur.term; const note = field ? (cur.note||'') : ov.querySelector('#dsNote').value.trim(); const g = field ? (cur.g??0) : +segVal(ov,'g');
+    const sv = segVal(ov,'story'); const story = sv==='LR' ? 'LR' : +sv; const size = field ? cur.size : segVal(ov,'size'); const term = segVal(ov,'term') || ''; const note = field ? (cur.note||'') : ov.querySelector('#dsNote').value.trim(); const g = field ? (cur.g??0) : +segVal(ov,'g');
     const status = segVal(ov,'status') || 'new';
     if (!seq.length && status!=='reuse') { toast('Enter the elbow sequence (A / B / offsets)'); return; }
     closeSheet(); snapshot();
     if (existing) Object.assign(existing, {story,size,term,note,seq,g,status}); else job.items.push({type:'ds', id:uid(), g, x:w.x, y:w.y, size, story, seq, term, note, status});
-    Object.assign(job.defaults, {dsSize:size, dsStory:story, dsTerm:term});
+    Object.assign(job.defaults, {dsSize:size, dsStory:story});
     afterItemsChanged(); if (existing) showProps();
   };
 }
@@ -1098,8 +1119,8 @@ function showProps(){
     <div class="row"><label class="l">Story</label>${segHTML('story', [[1,'1'],[2,'2']], it.story)}</div>
     <div class="row"><label class="l">Start end — now: ${esc(endLabel(rsv.l))}</label>${segHTML('lend', ENDS, it.lend||'auto')}</div>
     <div class="row"><label class="l">Finish end — now: ${esc(endLabel(rsv.r))}</label>${segHTML('rend', ENDS, it.rend||'auto')}</div>`;
-  else if (it.type==='ds') body = `<div class="row"><b>${it.status==='reuse'?'REUSE EXISTING · ':''}${esc(it.size)} · ${esc(seqText(it.seq)||'—')} · ${esc(storyName(it.story))} · ${esc(termLabel(it.term))}</b></div><div class="row">${it.note?esc(it.note):''}</div><div class="row"><button class="btn" id="pEditDs">Edit fields</button>${it.lo?'<button class="btn ghost" id="pLblReset">Auto-place label</button>':''}</div><div class="row" style="font-size:12px">Drag the label (gold dot) to move it.</div>`;
-  else if (it.type==='text') body = `<div class="row"><b>${esc(it.text)}</b></div><div class="row"><button class="btn" id="pEditTx">Edit text</button></div>`;
+  else if (it.type==='ds') body = `<div class="row"><b>${it.status==='reuse'?'REUSE EXISTING · ':''}${esc(it.size)} · ${esc(seqText(it.seq)||'—')} · ${esc(storyName(it.story))} · ${esc(it.term ? termLabel(it.term) : 'no termination')}</b></div><div class="row">${it.note?esc(it.note):''}</div><div class="row"><button class="btn" id="pEditDs">Edit fields</button>${it.lo?'<button class="btn ghost" id="pLblReset">Auto-place label</button>':''}</div><div class="row" style="font-size:12px">Drag the label (gold dot) to move it.</div>`;
+  else if (it.type==='text') body = `<div class="row"><b>${esc(it.text)}</b></div><div class="row"><button class="btn" id="pEditTx">Edit text</button></div><div class="row" style="font-size:12px">Point at more spots: drag from the gold <b>+</b> on the note. Double-tap a pointer end to remove it. ${(it.ptrs||[]).length ? `(${(it.ptrs||[]).length+1} pointers)` : ''}</div>`;
   else if (it.type==='ink') body = `<div class="row"><label class="l">Color</label>${segHTML('color', [['#000000','Black'],['#001738','Navy'],['#F15D22','Red-orange']], it.color)}</div><div class="row"><label class="l">Width</label>${segHTML('w', [[3,'Thin'],[7,'Thick']], it.w)}</div>`;
   const title = it.type==='tag' ? `${it.story}-story label` : it.type==='run'?(it.existing?'Existing gutter':'Gutter run'): it.type==='ds'?'Downspout': it.type==='acc'?ACC[it.sub].n: it.type==='haz'?HAZ[it.sub].n: it.type==='ink'?'Ink stroke':'Text callout';
   el.innerHTML = `<h3>${esc(title)}</h3>${grp}${body}<div class="actions" style="justify-content:space-between">${['acc','ds'].includes(it.type)?'<button class="btn" id="pRot">Rotate</button>':'<span></span>'}<span><button class="btn red" id="pDel">Delete</button> <button class="btn ghost" id="pClose">Close</button></span></div>`;
@@ -1138,6 +1159,7 @@ function setMode(m, silent){
 }
 $('#fFinish').onclick = () => { const n = job.items.filter(i=>i.type==='run' && !i.existing && !(i.len>0)).length; setMode('full'); if (n) toast(`${n} run${n>1?'s':''} still need a length (shown in red)`); };
 $('#fLen').onclick = () => setTool(tool==='len'?null:'len');
+$$('.standBtn').forEach(b => b.onclick = () => { const q = (VROT()+1)%4; setStand(q); toast(q ? `Drawing turned for the ${STAND[q].toUpperCase()} of the house — exports still print street-side down` : 'Back to the street view'); });
 $('#tField').onclick = () => setMode('field');
 $('#fRun').onclick = () => setTool(tool==='run'?null:'run');
 $('#fExist').onclick = () => { fieldExisting = !fieldExisting; toast(fieldExisting ? 'Runs will be marked EXISTING (dashed)' : 'Runs are new gutter'); if (tool!=='run') setTool('run'); else { pendingStart = pendingStart; updateHints(); render(); } $('#fExist').classList.toggle('active', fieldExisting); };
@@ -1172,7 +1194,7 @@ $('#camInput').addEventListener('change', async e => {
 function renderPhotoStrip(){ const s = $('#photoStrip'); s.innerHTML = job.photos.map(p => { const rec = imgCache.get(p.id); return `<div class="th" data-id="${p.id}">${rec?`<img src="${rec.url}">`:''}<span>${p.n}</span></div>`; }).join(''); s.querySelectorAll('.th').forEach(t => t.onclick = () => openPhotoViewer(t.dataset.id)); }
 function openPhotoViewer(id){
   const p = job.photos.find(x=>x.id===id); if (!p) return; const rec = imgCache.get(id); highlightPin = id; render();
-  const v = job.view; const sp = toScreen(p.x,p.y); if (sp.x<0||sp.x>W||sp.y<0||sp.y>H) { v.tx = W*0.25 - p.x*v.s; v.ty = H*0.5 - p.y*v.s; render(); }
+  const v = job.view; const sp = toScreen(p.x,p.y); if (sp.x<0||sp.x>W||sp.y<0||sp.y>H) { keepPoint(p.x, p.y, W*0.25, H*0.5, v.s); render(); }
   const ov = openSheet(`<div id="photoView"><h3>Photo ${p.n} <span class="tag">pin ${p.n} highlighted on canvas</span></h3>${rec?`<img src="${rec.url}">`:'<p>Photo not available</p>'}
     <div class="actions" style="justify-content:space-between"><span><button class="btn red" id="phDel">Delete</button> ${isField()?'':'<button class="btn" id="phBg">Use as background</button>'}</span><button class="btn gold" id="phClose">Close</button></div></div>`, {style:'background:#001738;color:#fff', onCancel:()=>{ highlightPin=null; render(); }});
   ov.querySelector('#phClose').onclick = () => { closeSheet(); highlightPin=null; render(); };
@@ -1186,7 +1208,7 @@ function setBackgroundImage(imgId, rec){
   const wW = 1200, wH = wW * rec.h / rec.w; // world size: 1200 units wide
   job.bg = {type:'image', imgId, rot:0, x:0, y:0, w:wW, h:wH}; fitView(); touch(); render(); toast('Background set — pinch to zoom, drag to pan');
 }
-function fitView(){ const bg=job.bg; const w = bg.rot%2? bg.h: bg.w, h = bg.rot%2? bg.w: bg.h; const cx=(bg.x||0)+bg.w/2, cy=(bg.y||0)+bg.h/2; const s = clamp(Math.min((W-40)/w, (H-200)/h), 0.15, 8); job.view.s=s; job.view.tx = W/2 - cx*s; job.view.ty = (H-100)/2 - cy*s; }
+function fitView(){ const bg=job.bg; const w = bg.rot%2? bg.h: bg.w, h = bg.rot%2? bg.w: bg.h; const cx=(bg.x||0)+bg.w/2, cy=(bg.y||0)+bg.h/2; const s = clamp(Math.min((W-40)/w, (H-200)/h), 0.15, 8); keepPoint(cx, cy, W/2, (H-100)/2, s); }
 $('#tBg').onclick = () => {
   const photos = job.photos.map(p => `<button class="btn ghost" data-ph="${p.id}">Photo ${p.n}</button>`).join('');
   const ov = openSheet(`<h3>Canvas background</h3>
@@ -1219,21 +1241,21 @@ $('#bgInput').addEventListener('change', async e => {
 });
 
 /* ---------------- validation ---------------- */
-function invalidSet(){ const s = new Set(); if (!job) return s; for (const it of job.items) { if (it.type==='run' && !it.existing && !(it.len>0)) s.add(it.id); if (it.type==='ds' && !(it.size && it.story && it.term && (it.status==='reuse' || (it.seq && it.seq.length)))) s.add(it.id); } return s; }
+function invalidSet(){ const s = new Set(); if (!job) return s; for (const it of job.items) { if (it.type==='run' && !it.existing && !(it.len>0)) s.add(it.id); if (it.type==='ds' && !(it.size && it.story && (it.status==='reuse' || (it.seq && it.seq.length)))) s.add(it.id); } return s; }
 function validationProblems(){
   const probs = [];
   if (!job.customer.trim()) probs.push('Customer name is blank');
   if (!job.address.trim()) probs.push('Address is blank');
-  let r=0, d=0; for (const it of job.items) { if (it.type==='run' && !it.existing && !(it.len>0)) r++; if (it.type==='ds') { const miss=[]; if(!it.size) miss.push('size'); if(!it.story) miss.push('story'); if(it.status!=='reuse' && (!it.seq || !it.seq.length)) miss.push('elbow sequence'); if(!it.term) miss.push('termination'); if (miss.length) d++; } }
+  let r=0, d=0; for (const it of job.items) { if (it.type==='run' && !it.existing && !(it.len>0)) r++; if (it.type==='ds') { const miss=[]; if(!it.size) miss.push('size'); if(!it.story) miss.push('story'); if(it.status!=='reuse' && (!it.seq || !it.seq.length)) miss.push('elbow sequence'); if (miss.length) d++; } }
   if (r) probs.push(`${r} gutter run${r>1?'s':''} with no length (shown in red)`);
-  if (d) probs.push(`${d} downspout${d>1?'s':''} missing size / story / elbows / termination (shown in red)`);
+  if (d) probs.push(`${d} downspout${d>1?'s':''} missing size / story / elbows (shown in red)`);
   if (!job.items.length) probs.push('The drawing is empty');   // repair-only jobs (no new gutter) are allowed
   return probs;
 }
 function validationWarnings(){
   const w = []; const n = job.items.filter(i => i.type==='run' && i.existing && i.cover && !(i.len>0)).length;
   if (n) w.push(`${n} existing run${n>1?'s have':' has'} covers but no length — the covers footage will be short`);
-  if (!job.manual.gutterColor) w.push('Gutter color not chosen'); if (job.items.some(i=>i.type==='ds' && i.status!=='reuse') && !job.manual.dsColor) w.push('Downspout color not chosen');
+  if (!job.manual.gutterColor) w.push('Gutter color not chosen'); if (!job.manual.wedges) w.push('Wedges not selected (pick None if no wedges)'); if (job.items.some(i=>i.type==='ds' && i.status!=='reuse') && !job.manual.dsColor) w.push('Downspout color not chosen');
   return w;
 }
 
@@ -1334,7 +1356,7 @@ function renderMaterials(){
     <label class="${mn.gutterColor==='custom'?'':'hidden'}" id="gcWrap">Custom gutter color<input data-m="gutterCustom" value="${esc(mn.gutterCustom||'')}"></label>
     <label class="${mn.dsColor==='custom'?'':'hidden'}" id="dcWrap">Custom downspout color<input data-m="dsCustom" value="${esc(mn.dsCustom||'')}"></label>
     <label>Gutter cover type<select data-m="coverType"><option value="">— select —</option>${COVER_TYPES.map(c=>`<option value="${esc(c)}" ${mn.coverType===c?'selected':''}>${esc(c)}</option>`).join('')}</select></label>
-    <label>Wedges<select data-m="wedges">${WEDGES.map(([v,l])=>`<option value="${v}" ${(mn.wedges||'none')===v?'selected':''}>${l}</option>`).join('')}</select></label>
+    <label>Wedges<select data-m="wedges"><option value="" ${!mn.wedges?'selected':''}>— select —</option>${WEDGES.map(([v,l])=>`<option value="${v}" ${mn.wedges===v?'selected':''}>${l}</option>`).join('')}</select></label>
     <label>Flex pipes<input type="number" inputmode="numeric" data-m="flexPipes" value="${esc(mn.flexPipes)}"></label>
     <label>Screws<input type="number" inputmode="numeric" data-m="screws" value="${esc(mn.screws)}"></label>
     <h4 class="full" style="margin:6px 0 0">Special order <span class="tag">size / color / amount</span></h4>
@@ -1346,7 +1368,7 @@ function renderMaterials(){
 /* ---------------- export ---------------- */
 function sceneBBox(){
   let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity; const add=(x,y)=>{ if(x<x0)x0=x; if(y<y0)y0=y; if(x>x1)x1=x; if(y>y1)y1=y; };
-  for (const it of job.items) { if (it.type==='run') { add(it.x1,it.y1); add(it.x2,it.y2); } else if (it.type==='ink') it.pts.forEach(q=>add(q[0],q[1])); else if (it.type==='text' || it.type==='tag') { const ex = it.type==='text' ? (String(it.text||'').split(/\n+/).filter(Boolean).length-1)*8 : 0; add(it.x-60,it.y-15-ex); add(it.x+60,it.y+15+ex); if (it.lx!==undefined) add(it.lx,it.ly); } else { add(it.x-25,it.y-25); add(it.x+25,it.y+35); } }
+  for (const it of job.items) { if (it.type==='run') { add(it.x1,it.y1); add(it.x2,it.y2); } else if (it.type==='ink') it.pts.forEach(q=>add(q[0],q[1])); else if (it.type==='text' || it.type==='tag') { const ex = it.type==='text' ? (String(it.text||'').split(/\n+/).filter(Boolean).length-1)*8 : 0; add(it.x-60,it.y-15-ex); add(it.x+60,it.y+15+ex); if (it.lx!==undefined) add(it.lx,it.ly); (it.ptrs||[]).forEach(q => add(q[0],q[1])); } else { add(it.x-25,it.y-25); add(it.x+25,it.y+35); } }
   for (const p of job.photos) add(p.x,p.y);
   const fp = bgFootprint(); if (fp) { add(fp.x,fp.y); add(fp.x+fp.w,fp.y+fp.h); }
   if (x0===Infinity) { x0=0;y0=0;x1=400;y1=300; }
@@ -1489,7 +1511,7 @@ function pdfMaterialsPages(doc){
   doc.setPage(1); let my = FRAME.bodyTop + 6; const mn = job.manual;
   doc.setFillColor(...gold); doc.rect(colR, my-10, PW-M-colR, 16, 'F'); doc.setTextColor(...navy); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.text('JOB DETAILS', colR+6, my+1); my += 18;
   const mline = (l,v) => { doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(...navy); doc.text(l, colR+6, my); doc.setFont('helvetica','bold'); const vs = String(v||'—'); const lw = doc.getTextWidth(l), room = (PW-M-4) - (colR+6+lw) - 8; let fs = 10; while (fs > 6.5 && doc.getTextWidth(vs) > room) { fs -= 0.5; doc.setFontSize(fs); } doc.text(vs, PW-M-4, my, {align:'right'}); doc.setDrawColor(225); doc.line(colR, my+4, PW-M, my+4); my += 15; };
-  mline('Gutter color', colorName(mn.gutterColor, mn.gutterCustom)); mline('Downspout color', colorName(mn.dsColor, mn.dsCustom)); mline('Gutter cover type', mn.coverType); mline('Wedges', (WEDGES.find(w=>w[0]===(mn.wedges||'none'))||WEDGES[0])[1]); mline('Flex pipes', mn.flexPipes); mline('Screws', mn.screws);
+  mline('Gutter color', colorName(mn.gutterColor, mn.gutterCustom)); mline('Downspout color', colorName(mn.dsColor, mn.dsCustom)); mline('Gutter cover type', mn.coverType); mline('Wedges', (mn.wedges ? (WEDGES.find(w=>w[0]===mn.wedges)||WEDGES[0])[1] : '— not selected —')); mline('Flex pipes', mn.flexPipes); mline('Screws', mn.screws);
   my += 8; doc.setFillColor(...gold); doc.rect(colR, my-10, PW-M-colR, 16, 'F'); doc.setTextColor(...navy); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.text('SPECIAL ORDER', colR+6, my+1); my += 18;
   MANUAL_TEXT.forEach(([k,l]) => mline(l, mn[k]));
   my += 8; doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.text('ADDITIONAL NOTES', colR+6, my); my += 13; doc.setFont('helvetica','normal'); doc.setFontSize(9.5); const noteLines = doc.splitTextToSize(mn.notes||'—', PW-M-colR-10); doc.text(noteLines, colR+6, my);
