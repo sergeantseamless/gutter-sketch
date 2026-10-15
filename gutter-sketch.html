@@ -1429,14 +1429,15 @@ function pdfFrame(doc, title, pageNo, pageTotal){
   doc.setTextColor(...grey); doc.setFontSize(6.5); doc.text(`Page ${pageNo} of ${pageTotal}  ·  ${filenameBase()}`, PW-M, PH-9, {align:'right'});
 }
 // legend: only the symbols that actually appear on this drawing
-const LEGEND_DEFS = [['gutter','Gutter'],['existing','Existing gutter'],['cover','Gutter cover'],['ds','Downspout'],['reuse','Reuse existing downspout'],['splashguard','Splash guard'],['splashblock','Splash block'],['dropoutlet','Drop outlet'],['rainchain','Rain chain']];
+const LEGEND_DEFS = [['gutter','Gutter'],['existing','Existing gutter'],['cover','Gutter cover'],['de','Drip edge extension'],['ds','Downspout'],['reuse','Reuse existing downspout'],['splashguard','Splash guard'],['splashblock','Splash block'],['dropoutlet','Drop outlet'],['rainchain','Rain chain']];
 function legendRowCount(){ const c = document.createElement('canvas').getContext('2d'); c.font='400 7.5px Helvetica,Arial'; return legendRows(t => c.measureText(t).width, PW-2*M).length; }
 function legendKeys(){
   const has = new Set();
   for (const it of job.items) {
-    if (it.type==='run') { has.add(it.existing ? 'existing' : 'gutter'); if (it.cover) has.add('cover'); }
+    if (it.type==='run') { has.add(it.existing ? 'existing' : 'gutter'); if (it.cover) has.add('cover'); if (it.de) has.add('de'); }
     else if (it.type==='ds') has.add(it.status==='reuse' ? 'reuse' : 'ds');
     else if (it.type==='acc' && ['splashguard','splashblock','dropoutlet','rainchain'].includes(it.sub)) has.add(it.sub);
+    else if (it.type==='acc' && it.sub==='dripedge') has.add('de');   // older jobs placed drip edge as an icon
   }
   return LEGEND_DEFS.filter(d => has.has(d[0]));
 }
@@ -1452,6 +1453,7 @@ function legendGlyph(p, key, x, cy){ // x = left edge, cy = vertical center, pag
     case 'gutter': p.line(x, cy, r, cy, {color:NAVY, width:2.5}); break;
     case 'existing': p.line(x, cy, r, cy, {color:'#7a7a7a', width:2, dash:[4,3]}); break;
     case 'cover': p.line(x, cy+2, r, cy+2, {color:NAVY, width:2.5}); p.line(x, cy-2.5, r, cy-2.5, {color:NAVY, width:1.2, dash:[3,2]}); break;
+    case 'de': p.line(x, cy-2, r, cy-2, {color:NAVY, width:2.5}); p.line(x, cy+2.5, r, cy+2.5, {color:NAVY, width:0.9}); break;   // run + thin line on the house side
     case 'ds': p.rect(mx-4, cy-4, 8, 8, {fill:NAVY}); break;
     case 'reuse': p.rect(mx-4, cy-4, 8, 8, {fill:'#fff', color:NAVY, width:1.3}); p.line(mx-4, cy+4, mx+4, cy-4, {color:NAVY, width:1.1}); break;
     case 'splashguard': { const pts=[]; for (let i=0;i<10;i++){ const R = i%2 ? 2.6 : 6, a = -Math.PI/2 + i*Math.PI/5; pts.push([mx+R*Math.cos(a), cy+R*Math.sin(a)]); } p.poly(pts, {fill:GOLD, color:NAVY, width:0.9, close:true}); break; }
