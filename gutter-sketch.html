@@ -397,7 +397,7 @@ const COLORS = ['white','satin white','linen','cameo','herringbone','almond','ra
 const NO_PAINT_COLORS = ['white','satin white','buckskin brown','beaver brown','royal brown','musket brown'];
 const WEDGES = [['none','No wedges'],['regular','Regular'],['steep','Steep'],['t','T wedges']];
 const SPLASH_GUARD_LF = 2.5;   // feet of coil added per splash guard
-const ENDS = [['auto','Auto'],['endcap','End cap'],['miter_in','Miter inside'],['miter_out','Miter outside'],['miter_bay_in','Bay miter inside'],['miter_bay_out','Bay miter outside'],['continues','Continues']];
+const ENDS = [['auto','Auto'],['endcap','End cap'],['tiein','Tie-in to existing'],['miter_in','Miter inside'],['miter_out','Miter outside'],['miter_bay_in','Bay miter inside'],['miter_bay_out','Bay miter outside'],['continues','Continues']];
 const COVER_TYPES = ['ProGuard','Expanded Metal Mesh','Leaf Blaster Pro'];
 const MANUAL_TEXT = [['fascia','Fascia'],['soffit','Soffit'],['jchannel','J channel'],['collectorBox','Collector box (size / color)'],['misc','Misc']];   // special-order items, free text (size / color / amount)
 const STORIES = [[1,'1 story'],[1.5,'1.5 story'],[2,'2 story'],[2.5,'2.5 story'],[3,'3 story'],['LR','Lower roof']];
@@ -743,7 +743,8 @@ const CK = (x,y) => `${Math.round(x)},${Math.round(y)}`;
 // Resolve 'auto' run ends: a shared endpoint is a miter (inside/outside from the house shape), a loose end is an end cap.
 function resolveEnds(onlyGroups){   // onlyGroups: optional Set of group numbers — resolve corners as if only those runs existed
   const runs = job.items.filter(i => i.type==='run' && (!onlyGroups || onlyGroups.has(i.g||0)));   // existing runs take part in corner detection (tie-ins) but get no end marks
-  const res = new Map(); runs.forEach(r => res.set(r.id, r.existing ? {l:'none', r:'none'} : {l: (!r.lend||r.lend==='auto') ? 'endcap' : r.lend, r: (!r.rend||r.rend==='auto') ? 'endcap' : r.rend}));
+  const geo = m => !m || m==='auto' || m==='tiein';   // 'tiein' (answered in the joint pop-up, v3.8.2) follows the geometry like auto: a miter or splice where old gutter is, an end cap if that gutter is later removed
+  const res = new Map(); runs.forEach(r => res.set(r.id, r.existing ? {l:'none', r:'none'} : {l: geo(r.lend) ? 'endcap' : r.lend, r: geo(r.rend) ? 'endcap' : r.rend}));
   // 1. cluster run endpoints into nodes (shared endpoint = corner)
   const nodes = []; const nodeOf = new Map();   // "runId:1|2" -> node
   const findNode = (x,y) => nodes.find(n => dist(n.x,n.y,x,y) < 3);
@@ -791,7 +792,7 @@ function resolveEnds(onlyGroups){   // onlyGroups: optional Set of group numbers
     }
     const autoKind = kind; if (!auto) kind = job.corners[key];
     corners.push({key, x:n.x, y:n.y, kind, autoKind, auto, tiein, groups:[...new Set(newEnds.map(q => q.r.g||0))]});
-    for (const q of newEnds) { const rec = res.get(q.r.id); const manual = q.e===1 ? q.r.lend : q.r.rend; if (!manual || manual==='auto') { if (q.e===1) rec.l = kind; else rec.r = kind; } }
+    for (const q of newEnds) { const rec = res.get(q.r.id); const manual = q.e===1 ? q.r.lend : q.r.rend; if (geo(manual)) { if (q.e===1) rec.l = kind; else rec.r = kind; } }
   }
   return {ends: res, corners, side: sideOfRun};
 }
@@ -1122,7 +1123,12 @@ function endPointer(e){
   if (g.kind==='ink') { const pts = inkPreview; inkPreview = null; if (pts && pts.length>1) { snapshot(); job.items.push({type:'ink', id:uid(), g:curGroup, color:inkColor, w:inkW, pts: simplify(pts)}); afterItemsChanged(); } else render(); return; }
   if (g.kind==='rundrag') { runPreview = null; if (p.moved) { const s2 = snapPt(w.x,w.y); if (dist(g.start.x,g.start.y,s2.x,s2.y) > 4) { if (isField()) { commitRun(g.start, s2, 0, isExistingTool()); updateHints(); return; } openLengthPad(g.start, s2); return; } } else { tapRun(w); } render(); return; }
   if (g.kind==='ptr') { if (g.isNew && !p.moved) { g.it.ptrs.pop(); if (!g.it.ptrs.length) delete g.it.ptrs; toast('Drag from the + to the spot you want to point at'); render(); return; } if (!g.isNew && !p.moved && tap) { const now = performance.now(); if (lastPtrTap.id===g.it.id && lastPtrTap.i===g.i && now-lastPtrTap.t < 450) { snapshot(); g.it.ptrs.splice(g.i,1); if (!g.it.ptrs.length) delete g.it.ptrs; lastPtrTap = {}; afterItemsChanged(); showProps(); toast('Pointer removed'); return; } lastPtrTap = {id:g.it.id, i:g.i, t:now}; toast('Double-tap a pointer end to remove it'); return; } afterItemsChanged(); showProps(); return; }
-  if (g.kind==='move' || g.kind==='endpoint' || g.kind==='anchor' || g.kind==='dslabel') { if (p.moved) { afterItemsChanged(); showProps(); } else if (g.kind==='move') { if (tap) selectItem(g.it); } return; }
+  if (g.kind==='move' || g.kind==='endpoint' || g.kind==='anchor' || g.kind==='dslabel') { if (p.moved) { afterItemsChanged(); showProps();
+      if (g.kind==='endpoint') { const r = g.it, e = g.end; if (!r.existing) { const x = e===1?r.x1:r.x2, y = e===1?r.y1:r.y2, m = e===1?r.lend:r.rend;
+          const on = existingEndAt(x, y, r.id);
+          if ((on && (m==='tiein' || m==='endcap')) || (!on && m==='tiein')) { if (e===1) r.lend = 'auto'; else r.rend = 'auto'; afterItemsChanged(); showProps(); }   // landed on old gutter: ask afresh; dragged off it: the old answer no longer applies
+          if (on) askJoints(jointsOf(r).filter(j => j.e===e)); } else askJoints(jointsOf(r)); } }   // an end dragged onto old gutter (or old gutter dragged onto a new end): ask (v3.8.2)
+    else if (g.kind==='move') { if (tap) selectItem(g.it); } return; }
   if (g.kind==='pin') { if (p.moved) { touch(); render(); } else if (tap) openPhotoViewer(g.pin.id); return; }
   if (g.kind==='corner') { if (tap) cycleCorner(g.corner); return; }
   if (g.kind==='marquee') { const mq = marquee; marquee = null; if (mq && p.moved) { const n = boxSelect(mq); toast(n ? `${n} item${n>1?'s':''} added — ${multi.size} selected` : 'Nothing inside the box'); } else if (tap) handleTap(w, e); else render(); return; }
@@ -1188,10 +1194,31 @@ function tapRun(w){
 }
 function commitRun(start, end, len, existing){
   snapshot(); const d = job.defaults;
-  if (existing) job.items.push({type:'run', existing:true, id:uid(), g:curGroup, cover:false, x1:start.x, y1:start.y, x2:end.x, y2:end.y, len: len||0});
-  else job.items.push({type:'run', id:uid(), g:curGroup, x1:start.x, y1:start.y, x2:end.x, y2:end.y, len, profile:d.profile, cover:d.cover, story:d.story, lend:'auto', rend:'auto'});
+  const r = existing ? {type:'run', existing:true, id:uid(), g:curGroup, cover:false, x1:start.x, y1:start.y, x2:end.x, y2:end.y, len: len||0}
+                     : {type:'run', id:uid(), g:curGroup, x1:start.x, y1:start.y, x2:end.x, y2:end.y, len, profile:d.profile, cover:d.cover, story:d.story, lend:'auto', rend:'auto'};
+  job.items.push(r);
   lastEnd = {x:end.x, y:end.y}; pendingStart = {...lastEnd, fromLast:true};
   afterItemsChanged();
+  askJoints(jointsOf(r), () => { undo(); toast('Run removed'); });   // a new run meeting old gutter: Tie in or End cap? (Ben, 16 Oct; v3.8.2). Cancel takes the run back off.
+}
+/* ---- joint question: a new run end that lands on existing (dashed) gutter is either a tie-in (strip miter / splice, charged) or an end cap (nothing) ----
+   The rep answers once per joint; the answer is kept on that run end (lend / rend = 'tiein' | 'endcap') and shows in the run panel. */
+const existingEndAt = (x, y, skipId) => job.items.some(i => i.type==='run' && i.existing && i.id!==skipId && (dist(i.x1,i.y1,x,y) < 3 || dist(i.x2,i.y2,x,y) < 3));
+function jointsOf(r){   // [{r, e}] new-run ends that touch old gutter and have not been answered: r's own ends if r is new; other new runs' ends if r is existing
+  const out = [];
+  if (!r.existing) { for (const e of [1,2]) { const x = e===1?r.x1:r.x2, y = e===1?r.y1:r.y2, m = e===1?r.lend:r.rend; if ((!m || m==='auto') && existingEndAt(x, y, r.id)) out.push({r, e}); } }
+  else for (const o of job.items) if (o.type==='run' && !o.existing) for (const e of [1,2]) { const x = e===1?o.x1:o.x2, y = e===1?o.y1:o.y2, m = e===1?o.lend:o.rend; if ((!m || m==='auto') && (dist(r.x1,r.y1,x,y) < 3 || dist(r.x2,r.y2,x,y) < 3)) out.push({r:o, e}); }
+  return out;
+}
+function askJoints(list, onCancel){
+  if (!list.length) return;
+  const {r, e} = list[0], rest = list.slice(1);
+  const ov = openSheet(`<h3>Meets existing gutter</h3><div class="row" style="font-size:16px">This end of the new run lands on existing gutter. Is it tied in?</div>
+    <div class="seg big" data-seg="joint"><button class="btn" data-j="tiein">TIE IN<br><small style="font-weight:400">joins the old gutter: strip miter or splice</small></button><button class="btn" data-j="endcap">END CAP<br><small style="font-weight:400">new gutter stops here, nothing added</small></button></div>
+    <div class="actions"><button class="btn ghost" id="jCancel">Cancel</button></div>`, {dismiss:false});
+  ov.querySelectorAll('[data-j]').forEach(b => b.onclick = () => { closeSheet(); if (e===1) r.lend = b.dataset.j; else r.rend = b.dataset.j; touch(); renderMaterials(); render(); if (sel===r.id) showProps();
+    toast(b.dataset.j==='tiein' ? 'Tie-in to existing gutter' : 'End cap — not tied in'); askJoints(rest, onCancel); });
+  ov.querySelector('#jCancel').onclick = () => { closeSheet(); onCancel && onCancel(); };
 }
 
 /* ---------------- sheets ---------------- */
