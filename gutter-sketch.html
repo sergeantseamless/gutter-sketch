@@ -648,10 +648,22 @@ function openJob(id){
   syncHeader(); renderPhotoStrip(); renderMaterials(); render();
   pbPull('open');   // fire and forget: the job is already open and drawable
 }
-function addJobToStore(j){
-  store.jobs[j.id] = j; store.order.unshift(j.id);
-  while (store.order.length > 20) { const old = store.order.pop(); const oj = store.jobs[old]; if (oj) { oj.photos.forEach(p => idb.del(p.id)); if (oj.bg.imgId) idb.del(oj.bg.imgId); } delete store.jobs[old]; }
+const MAX_JOBS = 100;   /* jobs kept on this iPad; past that the least-recently-opened job goes (v3.9.2: was 20, and silent) */
+function jobLabel(j){ return (j && (j.customer || j.address)) || '(no name)'; }
+function jobsFullMsg(){ /* text for the confirm sheet when adding a job would remove the oldest one */
+  const oldest = store.jobs[store.order[store.order.length - 1]];
+  return `Jobs is full (${MAX_JOBS} on this iPad). Adding one removes the oldest job, ${jobLabel(oldest)}, and its photos.`;
 }
+function withRoomForJob(cb){ /* every path that adds a job goes through here: at the cap it asks first, naming the job that would go */
+  if (store.order.length < MAX_JOBS) return cb();
+  confirmSheet(jobsFullMsg(), 'Remove it and continue', cb);
+}
+function addJobToStore(j){ /* returns the label of a job removed to make room, else '' */
+  store.jobs[j.id] = j; store.order.unshift(j.id); let gone = '';
+  while (store.order.length > MAX_JOBS) { const old = store.order.pop(); const oj = store.jobs[old]; if (oj) { oj.photos.forEach(p => idb.del(p.id)); if (oj.bg.imgId) idb.del(oj.bg.imgId); gone = jobLabel(oj); } delete store.jobs[old]; }
+  return gone;
+}
+function addedToast(what, gone){ toast(gone ? `${what} · removed oldest job: ${gone}` : what); }
 let dirtyTimer = null;
 function touch(){ // mark dirty, autosave soon
   if (!job) return; job.updated = Date.now();
@@ -1413,7 +1425,7 @@ $('#fExist').onclick = () => { fieldExisting = !fieldExisting; toast(fieldExisti
 $('#fDs').onclick = () => setTool(tool==='ds'?null:'ds');
 $('#fUndo').onclick = undo; $('#tUndo').onclick = undo; $('#tRedo').onclick = redo;
 $('#fJobs').onclick = openJobs; $('#tJobs').onclick = openJobs;
-$('#tNew').onclick = () => confirmSheet('Start a new job? The current job stays saved in Jobs.', 'New job', () => { flushSave(); const j = newJob(); addJobToStore(j); openJob(j.id); });
+$('#tNew').onclick = () => confirmSheet(store.order.length >= MAX_JOBS ? jobsFullMsg() : 'Start a new job? The current job stays saved in Jobs.', 'New job', () => { flushSave(); const j = newJob(); const gone = addJobToStore(j); openJob(j.id); if (gone) addedToast('New job', gone); });
 $$('[data-tool]').forEach(b => b.addEventListener('click', () => { fieldExisting = false; setTool(b.dataset.tool, b.dataset.sub); }));
 $$('[data-ink]').forEach(b => b.addEventListener('click', () => { inkColor = b.dataset.ink; $$('[data-ink]').forEach(x=>x.classList.toggle('active', x===b)); setTool('ink'); }));
 $$('[data-inkw]').forEach(b => b.addEventListener('click', () => { inkW = +b.dataset.inkw; $$('[data-inkw]').forEach(x=>x.classList.toggle('active', x===b)); setTool('ink'); }));
@@ -2488,15 +2500,16 @@ $('#tExport').onclick = openExportSheet;
 /* ---------------- jobs list ---------------- */
 function openJobs(){
   const rows = store.order.map(id => store.jobs[id]).filter(Boolean).map(j => `<div class="jobrow"><div class="jt"><b>${esc(j.customer||'(no name)')}${j.id===job.id?' <span class="tag">open</span>':''}</b><span>${esc(j.address||'—')} · ${esc(j.date)} · ${j.items.length} items, ${j.photos.length} photos</span></div><button class="btn sm" data-open="${j.id}">Open</button><button class="btn sm ghost" data-dup="${j.id}">Duplicate</button></div>`).join('');
-  const ov = openSheet(`<h3>Jobs <span class="tag">last 20 · saved on this iPad</span></h3><div class="row"><button class="btn gold" id="jbNew">+ New job</button><button class="btn ghost" id="jbPrice">Price Book</button><button class="btn ghost" id="jbClose">Close</button></div><div class="joblist">${rows||'<p>No saved jobs yet.</p>'}</div>`);
+  const n = store.order.length, nearFull = n >= MAX_JOBS - 10;
+  const ov = openSheet(`<h3>Jobs <span class="tag" id="jobsCount">${n} of ${MAX_JOBS} · saved on this iPad</span></h3>${nearFull ? `<p class="pnote" id="jobsFullHint">${n >= MAX_JOBS ? 'Full: adding a job removes the oldest one (you will be asked first).' : `Room for ${MAX_JOBS - n} more. After that the oldest job is removed to make space (you will be asked first).`}</p>` : ''}<div class="row"><button class="btn gold" id="jbNew">+ New job</button><button class="btn ghost" id="jbPrice">Price Book</button><button class="btn ghost" id="jbClose">Close</button></div><div class="joblist">${rows||'<p>No saved jobs yet.</p>'}</div>`);
   ov.querySelector('#jbClose').onclick = closeSheet;
   ov.querySelector('#jbPrice').onclick = () => { closeSheet(); openPriceBook(); };
-  ov.querySelector('#jbNew').onclick = () => { closeSheet(); flushSave(); const j = newJob(); addJobToStore(j); openJob(j.id); toast('New job'); };
+  ov.querySelector('#jbNew').onclick = () => { closeSheet(); withRoomForJob(() => { flushSave(); const j = newJob(); const gone = addJobToStore(j); openJob(j.id); addedToast('New job', gone); }); };
   ov.querySelectorAll('[data-open]').forEach(b => b.onclick = () => { closeSheet(); flushSave(); openJob(b.dataset.open); });
-  ov.querySelectorAll('[data-dup]').forEach(b => b.onclick = async () => { closeSheet(); flushSave(); const src = store.jobs[b.dataset.dup]; const j = JSON.parse(JSON.stringify(src)); j.id = uid(); j.date = todayISO(); j.created = j.updated = Date.now(); delete j.noTearOff; if (j.price) j.price.lastCopy = null;   // a duplicate hasn't been quoted yet
+  ov.querySelectorAll('[data-dup]').forEach(b => b.onclick = () => { closeSheet(); withRoomForJob(async () => { flushSave(); const src = store.jobs[b.dataset.dup]; const j = JSON.parse(JSON.stringify(src)); j.id = uid(); j.date = todayISO(); j.created = j.updated = Date.now(); delete j.noTearOff; if (j.price) j.price.lastCopy = null;   /* a duplicate hasn't been quoted yet */
     for (const ph of j.photos) { const nid = uid(); const blob = await idb.get(ph.id); if (blob) await storeImage(nid, blob); ph.id = nid; }
     if (j.bg.imgId) { const nid = 'bg_'+uid(); const blob = await idb.get(j.bg.imgId); if (blob) await storeImage(nid, blob); j.bg.imgId = nid; }
-    addJobToStore(j); openJob(j.id); toast('Duplicated'); });
+    const gone = addJobToStore(j); openJob(j.id); addedToast('Duplicated', gone); }); });
 }
 
 /* ---------------- init ---------------- */
