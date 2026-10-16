@@ -213,6 +213,7 @@ body.full #contBar{bottom:68px;z-index:9}
 #photoView img{max-width:92vw;max-height:70vh;border-radius:10px;background:#000}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:40%;background:var(--navy);color:#fff;padding:14px 22px;border-radius:14px;font-weight:800;font-size:18px;z-index:99;pointer-events:none;opacity:0;transition:opacity .2s}
 #toast.show{opacity:1}
+.wfixes{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:6px 0 10px}.wfix{display:flex;flex-direction:column;font-weight:700;font-size:13px;gap:4px}.wfix select,.wfix input{min-height:44px;font-size:16px}.wfix.hidden{display:none}
 </style>
 </head>
 <body class="field">
@@ -2140,15 +2141,32 @@ async function deliver(blob, filename){
   if (navigator.canShare && navigator.canShare({files:[file]})) { try { await navigator.share({files:[file], title: filename}); return; } catch(e){ if (e && e.name==='AbortError') return; } }
   const a = $('#dl'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 10000);
 }
-let warnedOnce = null;
+let warnedOnce = null, skipWarnOnce = false;
+function exportFixables(){   // job-level picks the export check asks for, answerable inside the pop-up (v3.9.1)
+  const mn = job.manual, f = [], cl = COLORS.map(c => [c, c]);
+  if (!mn.gutterColor) f.push({k:'gutterColor', l:'Gutter color', opts:cl, custom:'gutterCustom'});
+  if (job.items.some(i => i.type==='ds' && i.status!=='reuse') && !mn.dsColor) f.push({k:'dsColor', l:'Downspout color', opts:cl, custom:'dsCustom'});
+  if (!mn.wedges) f.push({k:'wedges', l:'Wedges', opts:WEDGES});
+  if (job.items.some(i => i.type==='run' && i.cover) && !mn.coverType && !(job.scope.covers==='separate' && (job.scope.offer||[]).length)) f.push({k:'coverType', l:'Gutter cover type', opts:COVER_TYPES.map(c => [c, c])});
+  if (job.items.some(i => i.type==='run' && !i.existing && i.profile==='6" Half Round') && !mn.hrHangers) f.push({k:'hrHangers', l:'Half round hangers', opts:HR_HANGERS});
+  return f;
+}
 function blockIfInvalid(){
   const probs = validationProblems();
   if (probs.length) { openSheet(`<h3>Fix before exporting</h3><ul class="vlist">${probs.map(p=>`<li>${esc(p)}</li>`).join('')}</ul><div class="actions"><button class="btn gold" onclick="this.closest('.overlay').remove()">OK</button></div>`); render(); return true; }
-  const warns = validationWarnings(); const key = JSON.stringify(warns) + job.updated;
-  if (warns.length && warnedOnce !== key) { // soft warnings: shown once, then the next tap exports anyway
+  if (skipWarnOnce) { skipWarnOnce = false; return false; }
+  const fix = exportFixables(), FIXED_MSG = /^(Gutter color not chosen|Wedges not selected|Downspout color not chosen|Gutter cover type not chosen|Half round hangers not chosen)/;
+  const warns = validationWarnings().filter(t => !FIXED_MSG.test(t)); const key = JSON.stringify(warns) + JSON.stringify(fix.map(f => f.k)) + job.updated;
+  if ((warns.length || fix.length) && warnedOnce !== key) { // soft warnings: shown once; anything unpicked can be picked right here (v3.9.1)
     warnedOnce = key;
-    openSheet(`<h3>Heads up</h3><ul class="vlist">${warns.map(p=>`<li>${esc(p)}</li>`).join('')}</ul><div class="actions"><button class="btn ghost" onclick="this.closest('.overlay').remove()">Go back</button><button class="btn gold" id="wGo">Export anyway</button></div>`);
-    $('#wGo').onclick = () => { closeSheet(); pendingExport && pendingExport(); }; render(); return true;
+    const opt = (v, l, cur) => `<option value="${esc(v)}" ${cur===v?'selected':''}>${esc(l)}</option>`;
+    const fieldHTML = f => `<label class="wfix">${esc(f.l)}<select data-wf="${f.k}"><option value="">— select —</option>${f.opts.map(([v,l]) => opt(v, l, job.manual[f.k]||'')).join('')}</select></label>` + (f.custom ? `<label class="wfix hidden" data-wfc="${f.custom}">Custom ${esc(f.l.toLowerCase())}<input data-wf="${f.custom}" value="${esc(job.manual[f.custom]||'')}"></label>` : '');
+    const ov = openSheet(`<h3>${fix.length ? 'Pick these before you export' : 'Heads up'}</h3>${fix.length ? `<div class="wfixes">${fix.map(fieldHTML).join('')}</div>` : ''}${warns.length ? `<ul class="vlist">${warns.map(p=>`<li>${esc(p)}</li>`).join('')}</ul>` : ''}<div class="actions"><button class="btn ghost" id="wBack">Go back</button><button class="btn gold" id="wGo">Export anyway</button></div>`);
+    const goLbl = () => { const left = fix.filter(f => !job.manual[f.k]).length; ov.querySelector('#wGo').textContent = left || warns.length ? 'Export anyway' : 'Export'; };
+    ov.querySelectorAll('[data-wf]').forEach(el => el.addEventListener('input', () => { job.manual[el.dataset.wf] = el.value; const f = fix.find(x => x.k===el.dataset.wf); if (f && f.custom) ov.querySelector(`[data-wfc="${f.custom}"]`).classList.toggle('hidden', el.value!=='custom'); touch(); goLbl(); }));
+    goLbl();
+    ov.querySelector('#wBack').onclick = () => { closeSheet(); renderMaterials(); };
+    ov.querySelector('#wGo').onclick = () => { closeSheet(); renderMaterials(); skipWarnOnce = true; pendingExport && pendingExport(); }; render(); return true;
   }
   return false;
 }
