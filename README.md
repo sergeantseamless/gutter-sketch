@@ -2,7 +2,7 @@
 
 Internal field tool for Sergeant Seamless Gutter Services. Not customer-facing.
 
-An iPad + Apple Pencil app for drawing a gutter job on site: runs, downspouts, accessories, hazards, photos. It auto-counts the material list and exports a PDF (drawing + materials + photos) that gets attached to the Jobber quote. Jobber owns pricing, scope text and the signature — this app holds none of that.
+An iPad + Apple Pencil app for drawing a gutter job on site: runs, downspouts, accessories, hazards, photos. It auto-counts the material list and exports a PDF (drawing + materials + photos) that gets attached to the Jobber quote. It also suggests a price for the Base and each Option from Ben's price book, which he keeps in a private Google Sheet (never in this repo), and Jobber still holds the price the customer sees and signs.
 
 ## Where it runs
 
@@ -10,7 +10,7 @@ Live address (open in Safari on the iPad, then Share → Add to Home Screen):
 
 https://sergeantseamless.github.io/gutter-sketch/gutter-sketch.html
 
-All job data stays on the iPad (browser storage). Nothing is sent to a server. The hosted file is just the app itself.
+All job data stays on the iPad (browser storage); no job, drawing or photo is sent anywhere. The one thing the app sends is the price book key, to read Ben's private sheet; the feed link and key live only on each iPad. The hosted file is just the app itself.
 
 ## Updating the app
 
@@ -30,6 +30,8 @@ To roll back: repo page → **commits** → pick the older version → view the 
 Keep it that way. No customer data, exports, credentials or other files belong in this repo — it is public.
 
 ## Version history
+
+- **v3.7** (2026-10-15) — **Suggested price for the Base and each Option.** Full Mode's material panel has a **Price** card, hidden until you tap it. It closes again whenever a job opens or the app goes to Field Mode, and Field Mode never shows a price. Each group is priced from the drawing with Ben's price book: one total for the Base, one per Option, a Combined line, and a breakdown per group (quantity × rate = amount). On a job you can fix a quantity (grey = from the drawing; clear the box to go back), add a difficulty fee (Base by default, can move to an Option), add add-on lines for fascia, soffit, repairs or anything odd, and waive tear-off. Rates can't be changed on the iPad. A line with no rate says "rate missing" and its group says "incomplete" instead of a number; a run that hasn't been measured yet does the same, so a price never comes out short. Copper (solid or rustic) is never priced; copper metallic prices normally. The minimum job applies to the Base only. If a "Tear out" note is on the drawing but no run is marked for tear-off, the card says tear-off isn't being charged. **Copy for Jobber** copies "Base — $X" and "Option 1 — $Y" (one Jobber line item each). It refuses while a group is incomplete, leaves a copper group's price blank and skips an Option with nothing priced (and says so); the job remembers what was copied and flags it if the price changes later. Prices never print on any export. **Price Book** (Jobs → Price Book): each iPad connects once with Ben's setup code. After that the app reads his private Google Sheet by itself when it starts, when a job opens, and when it comes back after six hours. It keeps the last good copy for houses with no signal and shows the date of the prices it is using (amber after 30 days). The feed link and key stay on the iPad, and the rates live only in the sheet, never in this file. **New on the drawing:** "Replaces old gutter (tear off)" on new runs (also in Multi); **Bird cage** Yes/No on the downspout sheet (the label adds "· BIRD CAGE", and a new "Bird cages" material line counts them); rain chain type (Stocked / Customer's own / Other); half round hanger style (Internal / External) in the manual fields when the job has half round; and on an existing run with a cover, which gutter is under it. Saved jobs upgrade automatically.
 
 - **v3.6** (2026-10-15) — **Collector box** on the downspout sheet ("Collector box on top: No / Yes"): drawn as a funnel box on top of the downspout square, label starts with CB (e.g. "CB 2\" 2\" 1.5st · DRAIN"); elbows/offsets are whatever you tap (none required when there is a collector box); counted on a new "Collector boxes" material line and in the legend; its downspout is NOT counted as a gutter outlet (the outlet is part of the collector box). The Special-order collector box field is now a size / color note. **Extension** added to the termination buttons (label shows "· EXTENSION"), counted on a new "Downspout extensions" line. Both lines can be typed over.
 

@@ -113,6 +113,34 @@ body.full #contBar{bottom:68px;z-index:9}
 .mfields input,.mfields select,.mfields textarea{min-height:40px;border:1px solid var(--navy);border-radius:6px;padding:4px 8px;background:#fff;font-weight:400}
 .mfields .full{grid-column:span 2}
 
+/* price card (Full Mode material panel only; collapsed until tapped; never on an export) */
+#mPrice{grid-column:1/-1}
+.pcard{border:2px solid var(--navy);border-radius:12px;background:#fff;overflow:hidden}
+.pcard .phd{display:flex;width:100%;align-items:center;gap:8px;min-height:48px;padding:6px 12px;border:0;background:var(--navy);color:#fff;font-weight:800;font-size:15px;text-align:left}
+.pcard .pbd{padding:8px 10px 10px}
+.pt{width:100%;border-collapse:collapse;font-size:14px}
+.pt td,.pt th{padding:5px 6px;border-bottom:1px solid #e3d6a3;vertical-align:middle;text-align:left}
+.pt th{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#555}
+.pt .n{text-align:right;white-space:nowrap;font-weight:700}
+.pt tr.pg{cursor:pointer}
+.pt tr.pg td:first-child{font-weight:800}
+.pt tr.pg.on td{background:var(--cream)}
+.pt tr.pcomb td{font-weight:900;border-top:2px solid var(--navy)}
+.pt tr.psec td{font-weight:800;background:var(--cream);font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+.pt td.pdet{padding:0 0 8px 12px;background:#fffdf4}
+.pt small{font-size:11px;color:#555;font-weight:400}
+.pt input{width:76px;min-height:36px;border:1px solid #b9ae86;border-radius:6px;padding:2px 6px;text-align:right;font-weight:700;background:#fff}
+.pt input.set{border:2px solid var(--navy);background:var(--cream)}
+.pt input.wide{width:100%;min-width:140px;text-align:left;font-weight:400}
+.pt input::placeholder{color:#001738;opacity:.85}
+.pmiss{color:#E00000;font-weight:800}
+.pold{color:#8a4b00;background:#FFF0C3;border-radius:4px;padding:0 4px;font-weight:800}
+.pnote{font-size:12px;color:#444;margin:4px 0}
+.pbadge{display:inline-block;font-size:10px;font-weight:800;border-radius:6px;padding:1px 6px;margin-left:6px;background:var(--cream);color:#86090F;vertical-align:middle}
+.prow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0;font-size:14px}
+.prow input,.prow select{min-height:40px;border:1px solid var(--navy);border-radius:6px;padding:4px 8px;background:#fff}
+#pbScreen textarea,#pbScreen input[type=text]{width:100%;font-family:ui-monospace,Menlo,monospace;font-size:14px}
+
 /* overlays / sheets */
 .overlay{position:fixed;inset:0;background:rgba(0,23,56,.55);display:flex;align-items:center;justify-content:center;z-index:50;padding:12px}
 .sheet{background:var(--cream);border-radius:18px;padding:16px;max-width:96vw;max-height:92vh;overflow:auto;min-width:min(360px,96vw);box-shadow:0 8px 30px rgba(0,0,0,.4)}
@@ -290,6 +318,7 @@ body.full #contBar{bottom:68px;z-index:9}
         <div class="mbody">
           <div class="mcol" id="mAuto"></div>
           <div class="mcol" id="mManual"></div>
+          <div class="mcol" id="mPrice"></div>
         </div>
       </div>
     </div>
@@ -349,7 +378,7 @@ const OV_FIELDS = {
   coverLF:{get:m=>m.coverLF, set:(m,v)=>m.coverLF=v}, dsPieces:{get:m=>m.dsPieces, set:(m,v)=>m.dsPieces=v},
   elbA:{get:m=>m.elbA, set:(m,v)=>m.elbA=v}, elbB:{get:m=>m.elbB, set:(m,v)=>m.elbB=v}, elbRound:{get:m=>m.elbRound, set:(m,v)=>m.elbRound=v},
   dropOutlets:{get:m=>m.dropOutlets, set:(m,v)=>m.dropOutlets=v}, cb:{get:m=>m.cb, set:(m,v)=>m.cb=v}, dsExt:{get:m=>m.dsExt, set:(m,v)=>m.dsExt=v}, outlets:{get:m=>m.outlets, set:(m,v)=>m.outlets=v},
-  splashguard:{get:m=>m.acc.splashguard, set:(m,v)=>m.acc.splashguard=v}, splashblocks:{get:m=>m.splashblocks, set:(m,v)=>m.splashblocks=v}, rainchains:{get:m=>m.rainchains, set:(m,v)=>m.rainchains=v},
+  splashguard:{get:m=>m.acc.splashguard, set:(m,v)=>m.acc.splashguard=v}, splashblocks:{get:m=>m.splashblocks, set:(m,v)=>m.splashblocks=v}, birdCages:{get:m=>m.birdCages, set:(m,v)=>m.birdCages=v}, rainchains:{get:m=>m.rainchains, set:(m,v)=>m.rainchains=v},
 };
 ['2"','4"','6"'].forEach(sz => { OV_FIELDS['off'+sz] = {get:m=>m.offsets[sz], set:(m,v)=>m.offsets[sz]=v}; OV_FIELDS['roff'+sz] = {get:m=>m.offRound[sz], set:(m,v)=>m.offRound[sz]=v}; });
 const ovField = id => OV_FIELDS[id] || (id.startsWith('gutter:') ? {get:m=>m.gutter[id.slice(7)]||0, set:(m,v)=>m.gutter[id.slice(7)]=v} : null);
@@ -366,6 +395,20 @@ const DS_SIZE_MAP = {'3x4':'3×4"','4" round':'4" Round','4x5':'4×5"','square':
 const TERMS = [['splashblock','Splash block'],['drain','Drain'],['driveway','Driveway'],['rainchain','Rain chain'],['extension','Extension'],['other','Other']];
 const ACC = {splashguard:{n:'Splash guard',ab:'SG'}, splashblock:{n:'Splash block',ab:'SB'}, dropoutlet:{n:'Drop outlet',ab:'DO'}, offset:{n:'Offset / jog',ab:'OFF'}, dripedge:{n:'Drip edge ext.',ab:'DE'}, rainchain:{n:'Rain chain',ab:'RC'}};
 const HAZ = {ac:{n:'AC unit',ab:'AC'}, pool:{n:'Pool',ab:'POOL'}, dish:{n:'Satellite dish',ab:'SAT'}, chimney:{n:'Chimney',ab:'CHIM'}, tree:{n:'Tree',ab:'TREE'}, septic:{n:'Septic / well',ab:'SEP'}, power:{n:'Power line',ab:'PWR'}, landscape:{n:'Landscaping',ab:'LS'}, warn:{n:'Warning',ab:'!'}};
+const CHAIN_TYPES = [['stocked','Stocked'],['own',"Customer's own"],['other','Other']];   // rain chain type (part of the drawing; priced on the price card)
+const HR_HANGERS = [['internal','Internal (hidden)'],['external','External (stamped)']];   // half-round hanger style, one per job (same field and values as the Phase 2 scope writer: manual.hrHangers)
+// Price book ids: ids, labels and units only. The numbers live in Ben's private Google Sheet and reach each iPad
+// through the sheet's feed; this public file never holds a rate. Order and labels match the sheet.
+const PB_SECTIONS = [
+  ['Gutter', [['gutter_6k','6" K gutter','$ per ft'],['gutter_7k','7" K gutter','$ per ft'],['gutter_eurobox','European Box gutter','$ per ft'],['gutter_hr_internal','6" Half Round, internal hangers','$ per ft'],['gutter_hr_external','6" Half Round, external hangers','$ per ft'],['galvalume_add','Galvalume color, add-on','$ per ft']]],
+  ['Downspouts', [['ds_3x4','3×4" downspout','$ per ft of story footage'],['ds_2x3','2×3" downspout','$ per ft of story footage'],['ds_round','4" Round downspout','$ per ft of story footage'],['ds_4x5','4×5" downspout','$ per ft of story footage'],['ss_per_story','Smooth square downspout, per story','$ each'],['ss_extra_story','Smooth square, add per extra story','$ each'],['reuse_ds','Reused existing downspout','$ each'],['offset_each','Offset','$ each'],['ds_ft_1','Downspout footage, 1 story','ft'],['ds_ft_1_5','Downspout footage, 1.5 story','ft'],['ds_ft_2','Downspout footage, 2 story','ft'],['ds_ft_2_5','Downspout footage, 2.5 story','ft'],['ds_ft_3','Downspout footage, 3 story','ft'],['ds_ft_lr','Downspout footage, lower roof','ft']]],
+  ['Covers', [['cover_6k_proguard','ProGuard on 6" K','$ per ft'],['cover_6k_emm','Expanded metal mesh on 6" K','$ per ft'],['cover_6k_lbp','Leaf Blaster Pro on 6" K','$ per ft'],['cover_7k_proguard','ProGuard on 7" K','$ per ft'],['cover_7k_emm','Expanded metal mesh on 7" K','$ per ft'],['cover_7k_lbp','Leaf Blaster Pro on 7" K','$ per ft'],['cover_eb_proguard','ProGuard on European Box','$ per ft'],['cover_eb_emm','Expanded metal mesh on European Box','$ per ft'],['cover_eb_lbp','Leaf Blaster Pro on European Box','$ per ft'],['cover_hr_emm','Expanded metal mesh on 6" Half Round','$ per ft']]],
+  ['Accessories and adders', [['tie_in','Tie-in to existing gutter','$ each'],['splash_block','Splash block','$ each'],['bird_cage','Bird cage','$ each'],['flex_pipe','Flex pipe','$ each'],['rain_barrel_kit','Rain barrel install kit','$ each'],['collector_box','Collector box','$ each'],['splash_guard','Splash guard','$ each'],['drop_outlet','Drop outlet','$ each'],['drip_edge','Drip edge extension','$ per ft']]],
+  ['Rain chains', [['rc_install','Rain chain install','$ each'],['rc_stocked_length','Stocked rain chain, per 8 ft length','$ per length'],['rc_len_1','Stocked lengths, 1 story','lengths'],['rc_len_1_5','Stocked lengths, 1.5 story','lengths'],['rc_len_2','Stocked lengths, 2 story','lengths'],['rc_len_2_5','Stocked lengths, 2.5 story','lengths'],['rc_len_3','Stocked lengths, 3 story','lengths'],['rc_len_lr','Stocked lengths, lower roof','lengths']]],
+  ['Tear-off and job rules', [['tear_free_under','Tear-off is free under','ft'],['tear_per_ft','Tear-off rate','$ per ft'],['tear_min','Tear-off minimum charge','$'],['minimum_job','Minimum job (Base)','$']]],
+];
+const PB_INFO = Object.fromEntries(PB_SECTIONS.flatMap(([sec, rows]) => rows.map(([id, label, unit]) => [id, {label, unit, sec}])));
+const PB_IDS = Object.keys(PB_INFO);
 
 /* ---------------- storage ---------------- */
 const LS_KEY = 'gs_store_v1';
@@ -411,18 +454,102 @@ function shrinkImage(file, max){ return new Promise(res => {
     c.toBlob(b => res(b), 'image/jpeg', 0.82); };
   im.onerror = () => res(null); im.src = url; }); }
 
+/* ---------------- price book feed (Google Sheet → this iPad) ----------------
+   The sheet's Apps Script feed answers a POST that carries the key. The app only reads: it sends the key and
+   nothing else, never writes to the sheet, and keeps the last good copy so it can quote with no signal.
+   The feed link and key stay in PB_SRC_KEY on this iPad only: never in a job, an export, the console or the
+   clipboard (the one exception is the Copy setup code button). */
+const PB_SRC_KEY = 'gs_pricebook_src_v1', PB_KEY = 'gs_pricebook_v1';
+const PB_TIMEOUT_MS = 8000, PB_REPULL_MS = 6*3600*1000, PB_OLD_MS = 30*24*3600*1000;
+const pbRead = k => { try { return JSON.parse(localStorage.getItem(k)); } catch(e){ return null; } };
+function pbWrite(k, v){ try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e){ return false; } }
+function pbSource(){ const s = pbRead(PB_SRC_KEY); return (s && typeof s.url==='string' && typeof s.key==='string' && s.url && s.key) ? s : null; }
+function pbBook(){ const b = pbRead(PB_KEY); return (b && b.rates && typeof b.rates==='object') ? b : null; }
+// only the deployed web-app link: /macros/s/{id}/exec, or the Google Workspace form /a/macros/{domain}/s/{id}/exec
+const pbUrlOK = u => /^https:\/\/script\.google\.com\/(?:a\/macros\/[A-Za-z0-9.-]+|macros)\/s\/[A-Za-z0-9_-]+\/exec$/.test(u);
+function pbSig(rates){ const s = Object.keys(rates).sort().map(k => k + '=' + rates[k]).join('|'); let h = 0x811c9dc5; for (let i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h>>>0).toString(16); }   // FNV-1a over the sorted rates: spots a changed book
+const b64u = {
+  enc: s => { let bin = ''; new TextEncoder().encode(s).forEach(b => bin += String.fromCharCode(b)); return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); },
+  dec: s => { s = s.replace(/-/g,'+').replace(/_/g,'/'); while (s.length % 4) s += '='; const bin = atob(s); return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0))); },
+};
+const pbSetupCode = src => 'GSPB1.' + b64u.enc(JSON.stringify({u: src.url, k: src.key}));
+function pbParseCode(txt){ const t = String(txt||'').replace(/\s+/g,''); if (!t.startsWith('GSPB1.')) return null;
+  try { const o = JSON.parse(b64u.dec(t.slice(6))); const url = String(o.u||'').trim(), key = String(o.k||'').trim(); return (pbUrlOK(url) && key) ? {url, key} : null; } catch(e){ return null; } }
+let pbBusy = null;      // the pull in flight, so start + openJob don't double up
+let pbStatus = null;    // last pull result for the Price Book screen: {at, ok, msg}
+async function pbFetch(src){   // -> {ok:true, data} | {ok:false, msg}
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), PB_TIMEOUT_MS);
+  let res, text;
+  try {   // no headers at all: a plain-text POST is a "simple" request, so there is no CORS preflight (Apps Script doesn't answer one)
+    res = await fetch(src.url, {method:'POST', body: JSON.stringify({key: src.key}), signal: ctl.signal, credentials:'omit'});
+    text = await res.text();
+  } catch(e) {
+    return {ok:false, msg: (e && e.name==='AbortError') ? 'The feed took longer than 8 seconds to answer.'
+      : (navigator.onLine===false ? 'No signal.' : "Couldn't reach the feed. If there is signal, check the deployment's access is set to Anyone.")};
+  } finally { clearTimeout(timer); }
+  if (/^\s*</.test(text)) return {ok:false, msg:"The feed asked for a Google sign-in. Check the deployment's access is set to Anyone."};
+  let data; try { data = JSON.parse(text); } catch(e){ return {ok:false, msg: res.ok ? "The feed's answer wasn't a price book." : `The feed answered with an error (${res.status}).`}; }
+  if (!data || data.ok !== true) { const err = String((data && data.error) || ''); return {ok:false, msg: /not authori[sz]ed/i.test(err) ? 'Key not accepted. Ask Ben for a new setup code.' : 'The feed said: ' + (err || 'no price book')}; }
+  if (!data.rates || typeof data.rates !== 'object') return {ok:false, msg:"The feed's answer wasn't a price book."};
+  return {ok:true, data};
+}
+function pbMerge(data){   // a blank / non-number / flagged value keeps the last good number for that id and is listed as unread
+  const old = pbBook(), prev = old ? old.rates : {}, got = data.rates;
+  const flagged = new Set((Array.isArray(data.problems) ? data.problems : []).map(String));
+  const rates = {}, unread = [], unknown = [];
+  for (const id of PB_IDS) { const v = got[id];
+    if (typeof v==='number' && isFinite(v) && v >= 0 && !flagged.has(id)) rates[id] = v;
+    else { unread.push(id); if (typeof prev[id]==='number') rates[id] = prev[id]; } }
+  for (const id of Object.keys(got)) if (!PB_INFO[id]) unknown.push(id);
+  const book = {name: String(data.name||''), rates, pulledAt: new Date().toISOString(), sig: pbSig(rates), unread, unknown};
+  pbWrite(PB_KEY, book);
+  return {book, changed: !!old && old.sig !== book.sig};
+}
+function pbPull(why, candidate){   // never awaited by drawing / job-open code: a slow or dead feed blocks nothing
+  const src = candidate || pbSource(); if (!src) return Promise.resolve({ok:false, msg:'Not connected.'});
+  if (pbBusy && !candidate) return pbBusy;
+  const run = (async () => {
+    try {
+      const r = await pbFetch(src);
+      if (!r.ok) { pbStatus = {at: Date.now(), ok:false, msg: r.msg}; return r; }
+      if (candidate && !pbWrite(PB_SRC_KEY, {url: src.url, key: src.key})) return {ok:false, msg:"Couldn't save the connection on this iPad (storage full?)."};   // a new connection is kept only once it works
+      const m = pbMerge(r.data); pbStatus = {at: Date.now(), ok:true, msg:''};
+      if (m.changed && !isField()) { toast('Price book updated'); priceNewerNote(); }
+      return {ok:true, ...m};
+    } catch(e) { pbStatus = {at: Date.now(), ok:false, msg:"Couldn't read the price book."}; return {ok:false, msg: pbStatus.msg}; }
+  })();
+  if (candidate) return run;
+  pbBusy = run.finally(() => { pbBusy = null; if (document.getElementById('pbScreen') && pbSource()) openPriceBook(); });
+  return pbBusy;
+}
+document.addEventListener('visibilitychange', () => {   // back in the foreground: pull again if the book is more than 6 hours old
+  if (document.visibilityState !== 'visible' || !pbSource()) return;
+  const b = pbBook(); if (!b || !(Date.now() - Date.parse(b.pulledAt) < PB_REPULL_MS)) pbPull('foreground');
+});
+
 /* ---------------- job model ---------------- */
 function newJob(){
   return { id: uid(), customer:'', address:'', date: todayISO(), quote:'', prep: localStorage.getItem('gs_prep') || '',
     items: [], photos: [], photoSeq: 0,
     bg: {type:'grid', rot:0, imgId:null, w:0, h:0},
-    manual: {gutterColor:'', gutterCustom:'', dsColor:'', dsCustom:'', wedges:'', coverType:'', hangerOv:{}, rcKitOv:{}, geocelOv:{}, ovr:{}, flexPipes:'', geocel:'', screws:'', poDelivery:'', fascia:'', soffit:'', jchannel:'', collectorBox:'', misc:'', notes:'', straps:{}}, corners:{}, v:4,
+    manual: {gutterColor:'', gutterCustom:'', dsColor:'', dsCustom:'', wedges:'', coverType:'', hrHangers:'', hangerOv:{}, rcKitOv:{}, geocelOv:{}, ovr:{}, flexPipes:'', geocel:'', screws:'', poDelivery:'', fascia:'', soffit:'', jchannel:'', collectorBox:'', misc:'', notes:'', straps:{}}, corners:{}, v:5,
+    price: newPrice(),   // price card state only (quantity fixes, fee, add-ons); rates never live in a job
     defaults: {profile:'6" K', cover:false, story:1, lend:'auto', rend:'auto', dsSize:'3×4"', dsStory:1, dsTerm:'', group:0},
     view: {tx:80, ty:140, s:1}, mode:'field', created: Date.now(), updated: Date.now() };
+}
+function newPrice(){ return {ovr:{}, manual:{}, fee:{amount:0, group:0, note:''}, tearWaived:false, chainCost:{}, lastCopy:null}; }
+function normPrice(j){   // keep job.price well-formed whatever an older build or a hand-edited job left behind
+  const P = (j.price && typeof j.price==='object') ? j.price : (j.price = newPrice()), obj = v => v && typeof v==='object' && !Array.isArray(v);
+  if (!obj(P.ovr)) P.ovr = {}; if (!obj(P.manual)) P.manual = {}; if (!obj(P.chainCost)) P.chainCost = {};
+  if (!obj(P.fee)) P.fee = {amount:0, group:0, note:''};
+  P.fee.amount = Math.max(0, +P.fee.amount || 0); P.fee.group = clamp(Math.round(+P.fee.group || 0), 0, GROUPS.length-1); P.fee.note = String(P.fee.note || '');
+  for (const g of Object.keys(P.manual)) if (!Array.isArray(P.manual[g])) delete P.manual[g];
+  P.tearWaived = !!P.tearWaived; if (P.lastCopy === undefined) P.lastCopy = null;
 }
 let job = null;
 function openJob(id){
   job = store.jobs[id]; store.current = id;
+  priceOpen = false; priceDetail = null;   // the price card re-collapses whenever a job opens
   // migrate missing fields defensively
   const fresh = newJob(); const hadV = job.v;
   for (const k of Object.keys(fresh)) if (job[k] === undefined) job[k] = fresh[k];
@@ -451,12 +578,15 @@ function openJob(id){
     job.v = 4;
   }
   for (const it of job.items) if (it.type==='ds' && !Array.isArray(it.seq)) it.seq = typeof it.seq==='string' ? it.seq.split('').filter(c=>c==='A'||c==='B') : [];
+  if (job.v < 5) job.v = 5;   // v4 -> v5: job.price (price card state) added; new optional fields run.tearOut, ds.birdCage, chain, manual.hrHangers default to off
+  normPrice(job); pbView = pbBook();
   undoStack.length = 0; redoStack.length = 0; sel = null; multi.clear(); pendingStart = null; lastEnd = null; lastTouch = null;
   const runs = job.items.filter(i => i.type === 'run'); if (runs.length) { const r = runs[runs.length-1]; lastEnd = {x:r.x2, y:r.y2}; }
   setMode(job.mode || 'field', true);
   saveStore();
   Promise.all([...job.photos.map(p => cacheImage(p.id)), job.bg.imgId ? cacheImage(job.bg.imgId) : null]).then(() => { renderPhotoStrip(); render(); });
   syncHeader(); renderPhotoStrip(); renderMaterials(); render();
+  pbPull('open');   // fire and forget: the job is already open and drawable
 }
 function addJobToStore(j){
   store.jobs[j.id] = j; store.order.unshift(j.id);
@@ -685,8 +815,9 @@ function drawDS(p, d, o){
   else p.rect(d.x-s/2, d.y-s/2, s, s, {fill:col, color: d.g===1?NAVY:undefined, width:1.5});
   if (d.cb) p.poly([[d.x-13, d.y-s/2-13],[d.x+13, d.y-s/2-13],[d.x+6, d.y-s/2-1],[d.x-6, d.y-s/2-1]], {fill:'#fff', color:col, width:2.5, close:true});   /* collector box: funnel on top */
   const tt = d.term ? ' · ' + termLabel(d.term).toUpperCase() : '';   // termination shows only when one was picked
+  const bc = d.birdCage ? ' · BIRD CAGE' : '';                        // bird cage (top of the downspout) is called out before the termination (bottom)
   const core = reuse ? `REUSE ${d.story?dsStoryTag(d.story):''}`.trim() : (d.cb ? `CB ${seqText(d.seq)||''} ${d.story?dsStoryTag(d.story):''}` : `${seqText(d.seq)||'?'} ${d.story?dsStoryTag(d.story):'?'}`).replace(/\s+/g,' ').trim();
-  const l1 = core + tt;
+  const l1 = core + bc + tt;
   const s1 = field ? (reuse?13:14) : (reuse?10:11), l2 = (!field && !reuse && d.size && d.size!=='3×4"') ? d.size : null, s2 = 9;
   const w = Math.max(textW(l1, s1), l2 ? textW(l2, s2) : 0), h = s1*1.35 + (l2 ? s2*1.35 + 1 : 0);
   let cx, cy;
@@ -1048,18 +1179,22 @@ function openDsSheet(w, existing){
       <div class="seg big" id="seqKeys">${SEQ_TOKENS.map(t=>`<button class="btn" data-e="${esc(t)}">${esc(t)}</button>`).join('')}<button class="btn" data-e="bs">⌫</button></div>
       <div class="seqbox" id="seqBox">${esc(seqText(seq))}</div></div>
     <div class="row"><label class="l">Termination <span style="font-weight:400">(optional — tap again to clear)</span></label>${segHTML('term', TERMS, cur.term, field).replace('class="seg', 'data-clear="1" class="seg')}</div>
+    <div class="row"><label class="l">Bird cage <span style="font-weight:400">(wire strainer in the outlet — where a tree hangs over)</span></label>${segHTML('bird', [['0','No'],['1','Yes']], cur.birdCage?'1':'0', field)}</div>
+    <div class="row ${cur.term==='rainchain'?'':'hidden'}" id="dsChain"><label class="l">Rain chain</label>${segHTML('chain', CHAIN_TYPES, cur.chain||'stocked', field)}</div>
     ${field?'':`<div class="row"><label class="l">Note</label><input type="text" id="dsNote" value="${esc(cur.note||'')}" placeholder="optional"></div>
     <div class="row"><label class="l">Group</label>${segHTML('g', GROUPS.map((g,i)=>[i,g.n]), cur.g??0)}</div>`}
     <div class="actions"><button class="btn ghost" id="dsCancel">Cancel</button><button class="btn gold" id="dsDone">DONE</button></div>`, {onCancel:()=>render()});
   const box = ov.querySelector('#seqBox');
+  ov.addEventListener('click', e => { if (e.target.closest('[data-seg="term"]')) ov.querySelector('#dsChain').classList.toggle('hidden', segVal(ov,'term')!=='rainchain'); });   // chain type shows only for a rain-chain termination
   ov.querySelector('#seqKeys').addEventListener('click', e => { const b=e.target.closest('[data-e]'); if(!b) return; if (b.dataset.e==='bs') seq.pop(); else if (seq.length<12) seq.push(b.dataset.e); box.textContent = seqText(seq); });
   ov.querySelector('#dsCancel').onclick = () => { closeSheet(); render(); };
   ov.querySelector('#dsDone').onclick = () => {
     const sv = segVal(ov,'story'); const story = sv==='LR' ? 'LR' : +sv; const size = field ? cur.size : segVal(ov,'size'); const term = segVal(ov,'term') || ''; const note = field ? (cur.note||'') : ov.querySelector('#dsNote').value.trim(); const g = field ? (cur.g??0) : +segVal(ov,'g');
-    const status = segVal(ov,'status') || 'new'; const cb = segVal(ov,'cb')==='1';
+    const status = segVal(ov,'status') || 'new'; const cb = segVal(ov,'cb')==='1'; const bird = segVal(ov,'bird')==='1'; const chain = term==='rainchain' ? (segVal(ov,'chain') || 'stocked') : null;
     if (!seq.length && status!=='reuse' && !cb) { toast('Enter the elbow sequence (A / B / offsets)'); return; }
     closeSheet(); snapshot();
-    if (existing) { Object.assign(existing, {story,size,term,note,seq,g,status}); if (cb) existing.cb = true; else delete existing.cb; } else job.items.push({type:'ds', id:uid(), g, x:w.x, y:w.y, size, story, seq, term, note, status, ...(cb?{cb:true}:{})});
+    if (existing) { Object.assign(existing, {story,size,term,note,seq,g,status}); if (cb) existing.cb = true; else delete existing.cb; if (bird) existing.birdCage = true; else delete existing.birdCage; if (chain) existing.chain = chain; else delete existing.chain; }
+    else job.items.push({type:'ds', id:uid(), g, x:w.x, y:w.y, size, story, seq, term, note, status, ...(cb?{cb:true}:{}), ...(bird?{birdCage:true}:{}), ...(chain?{chain}:{})});
     Object.assign(job.defaults, {dsSize:size, dsStory:story});
     afterItemsChanged(); if (existing) showProps();
   };
@@ -1091,10 +1226,12 @@ function showMultiProps(){
   const cs = new Set(runs.map(r => !!r.cover)); const ccur = cs.size===1 ? ([...cs][0] ? '1' : '0') : null;
   const ds2 = new Set(runs.map(r => !!r.de)); const dcur = ds2.size===1 ? ([...ds2][0] ? '1' : '0') : null;
   const xs = new Set(runs.map(r => !!r.existing)); const xcur = xs.size===1 ? ([...xs][0] ? 'existing' : 'new') : null;
+  const nruns = runs.filter(r => !r.existing); const ts = new Set(nruns.map(r => !!r.tearOut)); const tcur = ts.size===1 ? ([...ts][0] ? '1' : '0') : null;   // tear-off applies to new runs only
   const gs = new Set(groupable.map(i => i.g||0)); const gcur = gs.size===1 ? [...gs][0] : null;
   el.innerHTML = `<h3>${items.length} selected</h3>${selAll}
     ${groupable.length ? `<div class="row"><label class="l">Move all to group</label>${segHTML('g', GROUPS.map((g,i)=>[i,g.short]), gcur)}</div>` : ''}
     ${runs.length ? `<div class="row"><label class="l">${runs.length} run${runs.length>1?'s are':' is'}</label>${segHTML('rstatus', [['new','NEW gutter'],['existing','EXISTING (dashed)']], xcur)}</div><div class="row"><label class="l">Gutter covers on ${runs.length} run${runs.length>1?'s':''}</label>${segHTML('cover', [['0','Off'],['1','On']], ccur)}</div><div class="row"><label class="l">Drip edge extension</label>${segHTML('de', [['0','No'],['1','Yes']], dcur)}</div>` : ''}
+    ${nruns.length ? `<div class="row"><label class="l">Replaces old gutter (tear off) — ${nruns.length} new run${nruns.length>1?'s':''}</label>${segHTML('tear', [['0','No'],['1','Yes']], tcur)}</div>` : ''}
     <div class="row" style="font-size:12px">${items.filter(i=>i.type==='run').length} runs · ${items.filter(i=>i.type==='ds').length} downspouts · ${items.length - items.filter(i=>i.type==='run'||i.type==='ds').length} other</div>
     <div class="actions" style="justify-content:space-between"><button class="btn red" id="pMultiDel">Delete all</button><span><button class="btn" id="pMultiClear">Clear</button> <button class="btn ghost" id="pMultiOff">Done</button></span></div>`;
   el.classList.remove('hidden');
@@ -1102,6 +1239,7 @@ function showMultiProps(){
   wireSeg(el,'cover', v => { snapshot(); runs.forEach(r => r.cover = v==='1'); afterItemsChanged(); showProps(); });
   wireSeg(el,'de', v => { snapshot(); runs.forEach(r => r.de = v==='1'); afterItemsChanged(); showProps(); });
   wireSeg(el,'rstatus', v => { snapshot(); runs.forEach(r => setRunStatus(r, v==='existing')); afterItemsChanged(); showProps(); });
+  wireSeg(el,'tear', v => { snapshot(); nruns.forEach(r => { if (v==='1') r.tearOut = true; else delete r.tearOut; }); afterItemsChanged(); showProps(); });
   wireSelAll();
   el.querySelector('#pMultiDel').onclick = () => { snapshot(); job.items = job.items.filter(i => !multi.has(i.id)); multi.clear(); afterItemsChanged(); showProps(); };
   el.querySelector('#pMultiClear').onclick = () => { multi.clear(); showProps(); render(); };
@@ -1116,16 +1254,19 @@ function showProps(){
   const statusRow = `<div class="row"><label class="l">This run is</label>${segHTML('rstatus', [['new','NEW gutter'],['existing','EXISTING (dashed)']], it.existing?'existing':'new')}</div>`;
   if (it.type==='run' && it.existing) body = statusRow + `<div class="row"><b>Existing gutter — stays; not counted as gutter</b></div><div class="row"><label class="l">Length (ft, optional)</label><input type="number" inputmode="decimal" id="pLen" value="${it.len||''}" step="0.5"><button class="btn sm" id="pPad">Pad</button></div>
     <div class="row"><label class="l">Add gutter cover</label>${segHTML('cover', [['0','No'],['1','Yes']], it.cover?'1':'0')}</div>
+    ${it.cover ? `<div class="row"><label class="l">Gutter under the cover <span style="font-weight:400">(sets the cover price${it.profile ? '' : ` — not set, priced as ${esc(dominantProfile() || PROFILES[0])}`})</span></label>${segHTML('xprof', PROFILES, it.profile||'')}</div>` : ''}
     <div class="row"><label class="l">Drip edge extension</label>${segHTML('de', [['0','No'],['1','Yes']], it.de?'1':'0')}</div>`;
   else if (it.type==='run') body = statusRow + `<div class="row"><label class="l">Length (ft)</label><input type="number" inputmode="decimal" id="pLen" value="${it.len||''}" step="0.5"><button class="btn sm" id="pPad">Pad</button></div>
     <div class="row"><label class="l">Profile</label>${segHTML('profile', PROFILES, it.profile)}</div>
     <div class="row"><label class="l">Gutter cover</label>${segHTML('cover', [['0','Off'],['1','On']], it.cover?'1':'0')}</div>
     <div class="row"><label class="l">Drip edge extension</label>${segHTML('de', [['0','No'],['1','Yes']], it.de?'1':'0')}</div>
+    <div class="row"><label class="l">Replaces old gutter (tear off)</label>${segHTML('tear', [['0','No'],['1','Yes']], it.tearOut?'1':'0')}</div>
     <div class="row"><label class="l">Story</label>${segHTML('story', [[1,'1'],[2,'2']], it.story)}</div>
     <div class="row"><label class="l">Start end — now: ${esc(endLabel(rsv.l))}</label>${segHTML('lend', ENDS, it.lend||'auto')}</div>
     <div class="row"><label class="l">Finish end — now: ${esc(endLabel(rsv.r))}</label>${segHTML('rend', ENDS, it.rend||'auto')}</div>`;
-  else if (it.type==='ds') body = `<div class="row"><b>${it.status==='reuse'?'REUSE EXISTING · ':''}${it.cb?'COLLECTOR BOX · ':''}${esc(it.size)} · ${esc(seqText(it.seq)||'—')} · ${esc(storyName(it.story))} · ${esc(it.term ? termLabel(it.term) : 'no termination')}</b></div><div class="row">${it.note?esc(it.note):''}</div><div class="row"><button class="btn" id="pEditDs">Edit fields</button>${it.lo?'<button class="btn ghost" id="pLblReset">Auto-place label</button>':''}</div><div class="row" style="font-size:12px">Drag the label (gold dot) to move it.</div>`;
+  else if (it.type==='ds') body = `<div class="row"><b>${it.status==='reuse'?'REUSE EXISTING · ':''}${it.cb?'COLLECTOR BOX · ':''}${esc(it.size)} · ${esc(seqText(it.seq)||'—')} · ${esc(storyName(it.story))}${it.birdCage?' · BIRD CAGE':''} · ${esc(it.term ? termLabel(it.term) : 'no termination')}${it.term==='rainchain' ? ' (' + esc((CHAIN_TYPES.find(c => c[0]===(it.chain||'stocked'))||CHAIN_TYPES[0])[1].toLowerCase()) + ')' : ''}</b></div><div class="row">${it.note?esc(it.note):''}</div><div class="row"><button class="btn" id="pEditDs">Edit fields</button>${it.lo?'<button class="btn ghost" id="pLblReset">Auto-place label</button>':''}</div><div class="row" style="font-size:12px">Drag the label (gold dot) to move it.</div>`;
   else if (it.type==='text') body = `<div class="row"><b>${esc(it.text)}</b></div><div class="row"><button class="btn" id="pEditTx">Edit text</button></div><div class="row" style="font-size:12px">Point at more spots: drag from the gold <b>+</b> on the note. Double-tap a pointer end to remove it. ${(it.ptrs||[]).length ? `(${(it.ptrs||[]).length+1} pointers)` : ''}</div>`;
+  else if (it.type==='acc' && it.sub==='rainchain') body = `<div class="row"><label class="l">Chain</label>${segHTML('chain', CHAIN_TYPES, it.chain||'stocked')}</div>`;
   else if (it.type==='ink') body = `<div class="row"><label class="l">Color</label>${segHTML('color', [['#000000','Black'],['#001738','Navy'],['#F15D22','Red-orange']], it.color)}</div><div class="row"><label class="l">Width</label>${segHTML('w', [[3,'Thin'],[7,'Thick']], it.w)}</div>`;
   const title = it.type==='tag' ? `${it.story}-story label` : it.type==='run'?(it.existing?'Existing gutter':'Gutter run'): it.type==='ds'?'Downspout': it.type==='acc'?ACC[it.sub].n: it.type==='haz'?HAZ[it.sub].n: it.type==='ink'?'Ink stroke':'Text callout';
   el.innerHTML = `<h3>${esc(title)}</h3>${grp}${body}<div class="actions" style="justify-content:space-between">${['acc','ds'].includes(it.type)?'<button class="btn" id="pRot">Rotate</button>':'<span></span>'}<span><button class="btn red" id="pDel">Delete</button> <button class="btn ghost" id="pClose">Close</button></span></div>`;
@@ -1138,9 +1279,10 @@ function showProps(){
   }
   if (it.type==='run') wireSeg(el,'de', v => upd(()=>{ it.de=v==='1'; }));
   if (it.type==='run') wireSeg(el,'rstatus', v => upd(()=> setRunStatus(it, v==='existing')));
-  if (it.type==='run' && it.existing) wireSeg(el,'cover', v => upd(()=>{ it.cover=v==='1'; }));
+  if (it.type==='run' && it.existing) { wireSeg(el,'cover', v => { upd(()=>{ it.cover=v==='1'; }); showProps(); }); wireSeg(el,'xprof', v => upd(()=>{ it.profile=v; })); }
   if (it.type==='run' && !it.existing) {
     wireSeg(el,'profile', v => upd(()=>{ it.profile=v; job.defaults.profile=v; }));
+    wireSeg(el,'tear', v => upd(()=>{ if (v==='1') it.tearOut = true; else delete it.tearOut; }));
     wireSeg(el,'cover', v => upd(()=>{ it.cover=v==='1'; job.defaults.cover=it.cover; }));
     wireSeg(el,'story', v => upd(()=>{ it.story=+v; job.defaults.story=+v; }));
     wireSeg(el,'lend', v => upd(()=>{ it.lend=v; }));
@@ -1149,6 +1291,7 @@ function showProps(){
   if (it.type==='ds') { el.querySelector('#pEditDs').onclick = () => openDsSheet(null, it); const rb = el.querySelector('#pLblReset'); if (rb) rb.onclick = () => upd(()=> { delete it.lo; }); }
   if (it.type==='text') el.querySelector('#pEditTx').onclick = () => openTextSheet(null, it);
   if (it.type==='ink') { wireSeg(el,'color', v => upd(()=> it.color=v)); wireSeg(el,'w', v => upd(()=> it.w=+v)); }
+  if (it.type==='acc' && it.sub==='rainchain') wireSeg(el,'chain', v => upd(()=>{ it.chain = v; }));
   const rot = el.querySelector('#pRot'); if (rot) rot.onclick = () => upd(()=> it.rot = ((it.rot||0)+1)%4);
   el.querySelector('#pDel').onclick = () => upd(()=> { job.items = job.items.filter(i=>i!==it); sel=null; hideProps(); });
   el.querySelector('#pClose').onclick = () => { sel=null; hideProps(); render(); };
@@ -1158,7 +1301,7 @@ function showProps(){
 function setMode(m, silent){
   document.body.classList.toggle('field', m==='field'); document.body.classList.toggle('full', m!=='field');
   job.mode = m; hideProps(); sel = null;
-  if (m==='field') { setTool(null); } else { setTool('select'); renderMaterials(); renderPhotoStrip(); }
+  if (m==='field') { priceOpen = false; priceDetail = null; setTool(null); } else { setTool('select'); renderMaterials(); renderPhotoStrip(); }   // Field Mode: the price card re-collapses (and has no UI there at all)
   if (!silent) touch();
   setTimeout(resize, 30);
 }
@@ -1271,8 +1414,9 @@ function computeMaterials(gFilter, rs, noOv){ // gFilter: 'all' or group index; 
   rs = rs || resolveEnds();
   const inG = it => gFilter==='all' || (it.g||0)===+gFilter;
   const items = job.items.filter(i => inG(i) && !(i.type==='run' && i.existing));
-  const m = {gutter:{}, coverLF:0, sgLF:0, newLF:0, hangers:0, endcaps:0, endcapL:0, endcapR:0, miterIn:0, miterOut:0, miterBay:0, miterBayIn:0, miterBayOut:0, ds:0, dsReuse:0, dsBySize:{}, dsByStory:{}, elbA:0, elbB:0, offsets:{'2"':0,'4"':0,'6"':0}, outlets:0, straps:0, acc:{splashguard:0,splashblock:0,dropoutlet:0,offset:0,dripedge:0,rainchain:0}, rainchainTerm:0, sbTerm:0, dsPieces:0, dsPiecesBySize:{}, dsExt:0, cb:0, elbRound:0, offRound:{'2"':0,'4"':0,'6"':0}};
+  const m = {gutter:{}, coverLF:0, sgLF:0, newLF:0, hangers:0, endcaps:0, endcapL:0, endcapR:0, miterIn:0, miterOut:0, miterBay:0, miterBayIn:0, miterBayOut:0, ds:0, dsReuse:0, dsBySize:{}, dsByStory:{}, elbA:0, elbB:0, offsets:{'2"':0,'4"':0,'6"':0}, outlets:0, straps:0, acc:{splashguard:0,splashblock:0,dropoutlet:0,offset:0,dripedge:0,rainchain:0}, rainchainTerm:0, sbTerm:0, dsPieces:0, dsPiecesBySize:{}, dsExt:0, cb:0, birdCages:0, elbRound:0, offRound:{'2"':0,'4"':0,'6"':0}};
   for (const it of items) {
+    if (it.type==='ds' && it.birdCage) m.birdCages++;   // bird cages: on new and reused downspouts alike
     if (it.type==='run') { const L = +it.len||0; m.gutter[it.profile||'?'] = (m.gutter[it.profile||'?']||0) + L; m.newLF += L; if (it.cover) m.coverLF += L;
       const e = rs.ends.get(it.id) || {l:'endcap', r:'endcap'}; const le = rs.side ? leftEnd(it, rs.side) : 1;
       if (e.l==='endcap') { m.endcaps++; if (le===1) m.endcapL++; else m.endcapR++; } if (e.r==='endcap') { m.endcaps++; if (le===2) m.endcapL++; else m.endcapR++; } }
@@ -1342,7 +1486,7 @@ function renderMaterials(){
   const hov = job.manual.hangerOv[strapKey]; html += `<tr><td>Hangers <span style="font-size:11px;color:#555">(auto ${m.hangers} = ${fmtLF(m.newLF)} ÷ 2)</span></td><td><input type="number" inputmode="numeric" id="hangerOv" placeholder="${m.hangers}" value="${hov??''}"></td></tr>`;
   const gov = job.manual.geocelOv[strapKey]; html += `<tr><td>Geocel (tubes) <span style="font-size:11px;color:#555">(auto ${m.geocel} = ${m.miters ? `${m.miters} miter${m.miters>1?'s':''} ÷ 3` : `no miters, ${m.endcaps} end cap${m.endcaps===1?'':'s'} ÷ 20`})</span></td><td><input type="number" inputmode="numeric" id="geocelOv" placeholder="${m.geocel}" value="${gov??''}"></td></tr>`;
   html += row('Touch-up spray paint', m.paint ? `1 can — ${esc(colorName(job.manual.gutterColor, job.manual.gutterCustom))}` : '0');
-  html += orow('splashguard', 'Splash guards', mm => mm.acc.splashguard||'') + orow('splashblocks', 'Splash blocks', mm => mm.splashblocks||'') + orow('rainchains', 'Rain chains', mm => mm.rainchains||'');
+  html += orow('splashguard', 'Splash guards', mm => mm.acc.splashguard||'') + orow('splashblocks', 'Splash blocks', mm => mm.splashblocks||'') + orow('birdCages', 'Bird cages', mm => mm.birdCages||'') + orow('rainchains', 'Rain chains', mm => mm.rainchains||'');
   const rov = job.manual.rcKitOv[strapKey]; html += `<tr><td>Rain chain install kits <span style="font-size:11px;color:#555">(auto ${m.rcKits} = 1 per chain)</span></td><td><input type="number" inputmode="numeric" id="rcKitOv" placeholder="${m.rcKits}" value="${rov??''}"></td></tr>`;
   html += row('Drip edge extension', m.de ? 'Yes' : 'No', mm => mm.de ? 'Yes' : '');
   html += `</table>`;
@@ -1362,13 +1506,333 @@ function renderMaterials(){
     <label class="${mn.gutterColor==='custom'?'':'hidden'}" id="gcWrap">Custom gutter color<input data-m="gutterCustom" value="${esc(mn.gutterCustom||'')}"></label>
     <label class="${mn.dsColor==='custom'?'':'hidden'}" id="dcWrap">Custom downspout color<input data-m="dsCustom" value="${esc(mn.dsCustom||'')}"></label>
     <label>Gutter cover type<select data-m="coverType"><option value="">— select —</option>${COVER_TYPES.map(c=>`<option value="${esc(c)}" ${mn.coverType===c?'selected':''}>${esc(c)}</option>`).join('')}</select></label>
+    ${job.items.some(i => i.type==='run' && !i.existing && i.profile==='6" Half Round') || mn.hrHangers ? `<label>Half round hangers<select data-m="hrHangers"><option value="">— select —</option>${HR_HANGERS.map(([v,l])=>`<option value="${v}" ${mn.hrHangers===v?'selected':''}>${l}</option>`).join('')}</select></label>` : ''}
     <label>Wedges<select data-m="wedges"><option value="" ${!mn.wedges?'selected':''}>— select —</option>${WEDGES.map(([v,l])=>`<option value="${v}" ${mn.wedges===v?'selected':''}>${l}</option>`).join('')}</select></label>
     <label>Flex pipes<input type="number" inputmode="numeric" data-m="flexPipes" value="${esc(mn.flexPipes)}"></label>
     <label>Screws<input type="number" inputmode="numeric" data-m="screws" value="${esc(mn.screws)}"></label>
     <h4 class="full" style="margin:6px 0 0">Special order <span class="tag">size / color / amount</span></h4>
     ${MANUAL_TEXT.map(([k,l]) => `<label>${l}<input data-m="${k}" value="${esc(mn[k]||'')}" placeholder="e.g. 24' 1×6 white"></label>`).join('')}
     <label class="full">Additional notes<textarea data-m="notes" rows="3">${esc(mn.notes)}</textarea></label></div>`;
-  $$('#mManual [data-m]').forEach(el => el.addEventListener('input', () => { job.manual[el.dataset.m] = el.value; touch(); if (['gutterColor','dsColor','wedges','coverType'].includes(el.dataset.m)) renderMaterials(); }));
+  $$('#mManual [data-m]').forEach(el => el.addEventListener('input', () => { job.manual[el.dataset.m] = el.value; touch(); if (['gutterColor','dsColor','wedges','coverType','hrHangers'].includes(el.dataset.m)) renderMaterials(); else if (el.dataset.m==='flexPipes') renderPrice(); }));
+  renderPrice();
+}
+
+/* ---------------- pricing: a suggested price per Base / Option from the price book ----------------
+   Billable quantities come straight from the drawing (job.items, plus the tie-in corners resolveEnds finds), never
+   from the material list: splash-guard coil, stock pieces and typed-over order counts don't move the price, and the
+   price card's own quantity type-overs (job.price.ovr) don't move the order. Rates come only from the cached price
+   book. A line with no rate shows "rate missing" and its group is incomplete, so nothing is priced at zero by accident. */
+const COPPER_COLORS = ['solid copper','rustic copper'];   // copper metallic is painted aluminum and prices normally
+const PROFILE_RATE = {'6" K':'gutter_6k', '7" K':'gutter_7k', 'European Box':'gutter_eurobox'};   // half round: by the job's hanger style
+const PROFILE_COVER = {'6" K':'6k', '7" K':'7k', 'European Box':'eb'};
+const COVER_RATE = {'ProGuard':'proguard', 'Expanded Metal Mesh':'emm', 'Leaf Blaster Pro':'lbp'};
+const DS_RATE = {'3×4"':'ds_3x4', '2×3"':'ds_2x3', '4" Round':'ds_round', '4×5"':'ds_4x5'};
+const MISS_WHY = {rate:'rate missing', hanger:'pick the half-round hanger style (Manual)', cover:'pick the gutter cover type (Manual)', cost:'type the chain cost', len:'measure first', deicon:'set drip edge on the runs, then delete the icon'};
+const CENTS = 100;
+const round2 = n => Math.round((+n || 0) * CENTS) / CENTS;
+const money = n => { const v = round2(n); return '$' + v.toLocaleString('en-US', {minimumFractionDigits: Number.isInteger(v) ? 0 : 2, maximumFractionDigits: 2}); };
+const fmtQ = n => String(round2(n));
+const stKey = st => st==='LR' ? 'lr' : String(+st).replace('.', '_');   // story → price book id suffix (1.5 → 1_5)
+let priceOpen = false, priceDetail = null;   // the card starts collapsed; priceDetail = the group whose breakdown is open
+let pbView = null;                           // the book the card prices with; refreshed when the card or a job opens, so a pull never changes numbers already on screen
+const prRate = id => { const v = pbView && pbView.rates ? pbView.rates[id] : undefined; return (typeof v==='number' && isFinite(v) && v >= 0) ? v : undefined; };
+const prOv = (g, id) => { const o = ((job.price.ovr || {})[g] || {})[id]; return (o && o.qty !== undefined && o.qty !== null && o.qty !== '' && isFinite(+o.qty)) ? Math.max(0, +o.qty) : undefined; };
+const tearFt = g => job.items.filter(i => (i.g||0)===g && i.type==='run' && !i.existing && i.tearOut).reduce((s, r) => s + (+r.len || 0), 0);
+const tearEff = g => { const o = prOv(g, 'tear_off'); return o !== undefined ? o : tearFt(g); };
+function tearFee(ft){   // f(ft) on the job's total feet of old gutter removed; undefined = a rate is missing
+  if (!(ft > 0)) return 0;
+  const free = prRate('tear_free_under'), per = prRate('tear_per_ft'), min = prRate('tear_min');
+  if (free === undefined) return undefined;
+  if (ft < free) return 0;
+  if (per === undefined || min === undefined) return undefined;
+  return round2(Math.max(min, per * ft));
+}
+function computePrice(g, rs){
+  g = +g || 0; rs = rs || resolveEnds();
+  const P = job.price, mn = job.manual, items = job.items.filter(i => (i.g||0)===g && i.type!=='haz');
+  const lines = [];
+  const add = (id, label, autoQty, unit, rate, x = {}) => {   // one priced line; x carries detail / why / byHand / hideFree / always
+    const o = prOv(g, id), qty = o !== undefined ? o : autoQty;
+    if (!(qty > 0) && o === undefined && !x.always) return null;   // nothing for this line on the drawing
+    if (rate === 0 && x.hideFree) return null;                       // no charge in the book today: no line
+    const known = typeof rate === 'number', missing = !x.byHand && qty > 0 && !known;
+    const L = {id, label, qty, autoQty, unit, rate: known ? rate : null, amount: (known && !x.byHand) ? round2(qty * rate) : 0, auto: o === undefined, missing, why: 'rate', ...x};
+    lines.push(L); return L;
+  };
+  const accN = sub => items.filter(i => i.type==='acc' && i.sub===sub).length;
+  const runsNew = items.filter(i => i.type==='run' && !i.existing);
+  const dsAll = items.filter(i => i.type==='ds');
+  const dsPipe = dsAll.filter(d => d.status !== 'reuse' && d.term !== 'rainchain');   // a rain-chain termination prices as the chain, which takes the pipe's place
+  const cuG = COPPER_COLORS.includes(mn.gutterColor), cuD = COPPER_COLORS.includes(mn.dsColor);
+  const byProfile = (a, b) => PROFILES.indexOf(a) - PROFILES.indexOf(b);
+  // gutter: footage × the profile's rate (same rate at any story; height shows up in the downspouts)
+  const lf = {}; for (const r of runsNew) { const p = r.profile || '?'; lf[p] = (lf[p] || 0) + (+r.len || 0); }
+  let gutterFt = 0;
+  for (const p of Object.keys(lf).sort(byProfile)) {
+    let rid = PROFILE_RATE[p], label = `Gutter ${p}`, why = 'rate';
+    if (p === '6" Half Round') { const h = HR_HANGERS.find(x => x[0] === mn.hrHangers); rid = h ? 'gutter_hr_' + h[0] : null; if (h) label += `, ${h[0]} hangers`; else why = 'hanger'; }
+    const L = add('gutter:' + p, label, lf[p], 'ft', rid ? prRate(rid) : undefined, {why, byHand: cuG});
+    if (L) gutterFt += L.qty;
+  }
+  if (mn.gutterColor === 'galvalume') add('galv_gutter', 'Galvalume add-on, gutter', gutterFt, 'ft', prRate('galvalume_add'));
+  // covers: footage on covered runs, new and existing, × the grid rate for profile and cover type; half round only takes expanded metal mesh
+  const domP = dominantProfile() || PROFILES[0];
+  const cf = {}, guessed = {};   // guessed: feet of existing gutter whose profile nobody picked (priced as the job's main gutter)
+  for (const r of items) if (r.type==='run' && r.cover) { const p = r.profile || (r.existing ? domP : '?'); cf[p] = (cf[p] || 0) + (+r.len || 0); if (r.existing && !r.profile) guessed[p] = (guessed[p] || 0) + (+r.len || 0); }
+  const guessNote = p => guessed[p] ? `incl. ${fmtQ(guessed[p])} ft on existing gutter priced as ${p}; tap that run to pick the gutter under the cover` : '';
+  for (const p of Object.keys(cf).sort(byProfile)) {
+    if (p === '6" Half Round') { add('cover:' + p, 'Covers on 6" Half Round, expanded metal mesh', cf[p], 'ft', prRate('cover_hr_emm'), {detail: guessNote(p)}); continue; }
+    const ck = COVER_RATE[mn.coverType], pk = PROFILE_COVER[p];
+    add('cover:' + p, `Covers on ${p}` + (mn.coverType ? `, ${mn.coverType}` : ''), cf[p], 'ft', (ck && pk) ? prRate(`cover_${pk}_${ck}`) : undefined, {why: ck ? 'rate' : 'cover', detail: guessNote(p)});
+  }
+  // downspouts: story footage × the size's rate per foot; smooth square is flat per downspout
+  const dc = {}; for (const d of dsPipe) if (d.size !== 'Smooth Square') { const k = `${d.size}|${d.story}`; dc[k] = (dc[k] || 0) + 1; }
+  const dsOrder = (a, b) => { const [sa, ta] = a.split('|'), [sb, tb] = b.split('|'); return DS_SIZES.indexOf(sa) - DS_SIZES.indexOf(sb) || (ta==='LR') - (tb==='LR') || (+ta) - (+tb); };
+  let dsFt = 0;
+  for (const k of Object.keys(dc).sort(dsOrder)) {
+    const [size, s] = k.split('|'), st = s === 'LR' ? 'LR' : +s, ft = prRate('ds_ft_' + stKey(st)), per = DS_RATE[size] ? prRate(DS_RATE[size]) : undefined, ok = ft !== undefined && per !== undefined;
+    const L = add(`ds:${size}:${s}`, `${size} downspouts, ${storyName(st)}`, dc[k], 'each', ok ? round2(ft * per) : undefined, {detail: ok ? `${fmtQ(ft)} ft × ${money(per)}` : '', byHand: cuD});
+    if (L && ft !== undefined) dsFt += L.qty * ft;
+  }
+  if (mn.dsColor === 'galvalume') add('galv_ds', 'Galvalume add-on, downspouts', dsFt, 'ft', prRate('galvalume_add'));
+  const sc = {}; for (const d of dsPipe) if (d.size === 'Smooth Square') { const n = dsPieces(d.story); sc[n] = (sc[n] || 0) + 1; }   // stories rounded up (1.5 → 2), lower roof counts as one
+  for (const n of Object.keys(sc).map(Number).sort((a, b) => a - b)) {
+    const per = prRate('ss_per_story'), extra = prRate('ss_extra_story');
+    const rate = per === undefined ? undefined : n > 1 ? (extra === undefined ? undefined : per * n + extra * (n - 1)) : per;
+    add('ss:' + n, `Smooth square downspouts, ${n}-story price`, sc[n], 'each', rate, {byHand: cuD});
+  }
+  add('reuse_ds', 'Reused existing downspouts', dsAll.filter(d => d.status === 'reuse' && d.term !== 'rainchain').length, 'each', prRate('reuse_ds'));
+  // tie-ins: the corners resolveEnds already counts as strip miters into dashed existing gutter, charged to the new run's group
+  add('tie_in', 'Tie-ins to existing gutter', rs.corners.filter(c => c.tiein && c.kind !== 'seam' && c.groups.length && Math.min(...c.groups) === g).length, 'each', prRate('tie_in'));
+  let offs = accN('offset'); for (const d of dsPipe) if (d.size !== 'Smooth Square') for (const t of (d.seq || [])) if (OFFSET_SIZES.includes(t)) offs++;
+  add('offset_each', 'Offsets', offs, 'each', prRate('offset_each'), {hideFree: true});
+  add('splash_block', 'Splash blocks', accN('splashblock') + dsAll.filter(d => d.term === 'splashblock').length, 'each', prRate('splash_block'));
+  add('bird_cage', 'Bird cages', dsAll.filter(d => d.birdCage).length, 'each', prRate('bird_cage'));
+  add('collector_box', 'Collector boxes', dsAll.filter(d => d.cb).length, 'each', prRate('collector_box'));
+  add('splash_guard', 'Splash guards', accN('splashguard'), 'each', prRate('splash_guard'), {hideFree: true});
+  add('drop_outlet', 'Drop outlets', accN('dropoutlet'), 'each', prRate('drop_outlet'), {hideFree: true});
+  if (g === 0) add('flex_pipe', 'Flex pipe', Math.max(0, +mn.flexPipes || 0), 'each', prRate('flex_pipe'));   // job-level field: priced on the Base
+  // rain chains: a placed icon counts as one story; a downspout ending in a rain chain uses its own story
+  const chains = [...items.filter(i => i.type==='acc' && i.sub==='rainchain').map(it => ({it, st: 1})), ...dsAll.filter(d => d.term === 'rainchain').map(it => ({it, st: it.story || 1}))];
+  const inst = prRate('rc_install'), perLen = prRate('rc_stocked_length'), rcS = {}, rcOther = []; let rcOwn = 0;
+  for (const c of chains) { const t = c.it.chain || 'stocked'; if (t === 'own') rcOwn++; else if (t === 'other') rcOther.push(c); else rcS[c.st] = (rcS[c.st] || 0) + 1; }
+  for (const k of storyKeys(rcS)) { const st = k === 'LR' ? 'LR' : +k, n = prRate('rc_len_' + stKey(st)), ok = inst !== undefined && perLen !== undefined && n !== undefined;
+    add('rc:stocked:' + k, `Rain chains, stocked, ${storyName(st)}`, rcS[k], 'each', ok ? round2(inst + perLen * n) : undefined, {detail: ok ? `install + ${fmtQ(n)} × ${money(perLen)}` : ''}); }
+  add('rc:own', "Rain chains, customer's own (install only)", rcOwn, 'each', inst);
+  for (const c of rcOther) { const cost = P.chainCost[c.it.id], has = typeof cost === 'number' && isFinite(cost) && cost >= 0;
+    add('rc:other:' + c.it.id, `Rain chain, other chain, ${storyName(c.st)}`, 1, 'each', (inst !== undefined && has) ? round2(inst + cost) : undefined, {chainId: c.it.id, chainCost: has ? cost : null, why: has ? 'rate' : 'cost'}); }
+  add('rain_barrel_kit', 'Rain barrel install kits', 0, 'each', prRate('rain_barrel_kit'), {always: true});   // count typed by hand
+  add('drip_edge', 'Drip edge extension', items.filter(i => i.type==='run' && i.de).reduce((s, r) => s + (+r.len || 0), 0), 'ft', prRate('drip_edge'));
+  const deIcons = accN('dripedge');   // jobs from before v2.3 placed a drip edge icon; it carries no footage, so it can't be priced
+  if (deIcons) lines.push({id: 'de_icon', label: `${deIcons} old drip edge icon${deIcons > 1 ? 's' : ''}`, qty: deIcons, unit: '', rate: null, amount: 0, auto: true, missing: true, why: 'deicon', fixed: true});
+  // tear-off: one job-level formula on all the old gutter removed. The Base pays f(Base ft); an Option pays what its runs add to that.
+  const tf = tearEff(g);
+  if (tf > 0 || prOv(g, 'tear_off') !== undefined) {
+    const t = {id: 'tear_off', label: 'Tear-off of old gutter', qty: tf, autoQty: tearFt(g), unit: 'ft', rate: null, auto: prOv(g, 'tear_off') === undefined, formula: true};
+    if (P.tearWaived) lines.push({...t, amount: 0, missing: false, waived: true, detail: 'waived on this job'});
+    else { const base = tearEff(0), a = tearFee(g === 0 ? base : base + tf), b = g === 0 ? 0 : tearFee(base), fee = (a === undefined || b === undefined) ? undefined : round2(a - b);
+      lines.push({...t, amount: fee === undefined ? 0 : fee, missing: fee === undefined && tf > 0, why: 'rate', detail: g === 0 ? 'job formula on the old gutter removed' : 'what this option adds to the job tear-off'}); }
+  }
+  const fee = Math.max(0, +P.fee.amount || 0);
+  if (fee > 0 && (+P.fee.group || 0) === g) lines.push({id: 'fee', label: 'Difficulty fee', detail: P.fee.note || '', qty: 1, unit: '', rate: fee, amount: round2(fee), auto: true, missing: false, fixed: true});
+  (P.manual[g] || []).forEach((a, i) => { const amt = Math.max(0, +a.amount || 0); lines.push({id: 'addon:' + i, label: a.desc || 'Add-on', qty: 1, unit: '', rate: amt, amount: round2(amt), auto: true, missing: false, fixed: true, addon: i}); });
+  // a run drawn but not measured yet (draw first, measure later) would price as 0 ft: hold the group as incomplete until it has a length
+  const noLen = items.filter(i => i.type==='run' && !(+i.len > 0) && (!i.existing || i.cover || i.de)).length;
+  if (noLen) lines.push({id: 'nolen', label: `${noLen} run${noLen > 1 ? 's' : ''} with no length`, qty: noLen, unit: '', rate: null, amount: 0, auto: true, missing: true, why: 'len', fixed: true});
+  const manualOnly = (cuG && runsNew.length > 0) || (cuD && dsPipe.length > 0);   // copper is priced by hand from a live material list
+  let incomplete = !manualOnly && lines.some(l => l.missing);
+  const subtotal = round2(lines.reduce((s, l) => s + (l.missing || l.byHand ? 0 : l.amount), 0));
+  let total = subtotal, minimumApplied = false; const minimum = prRate('minimum_job');
+  // the fee and the job-level flex pipes sit on the Base by default: they count toward the minimum but don't make a Base job on their own
+  const work = lines.some(l => !l.missing && !l.byHand && l.amount > 0 && l.id !== 'fee' && l.id !== 'flex_pipe');
+  if (g === 0 && work && !manualOnly) {   // the minimum job is on the Base only; Options are add-ons
+    if (minimum === undefined) { incomplete = true; lines.push({id: 'minimum', label: 'Minimum job', qty: 1, unit: '', rate: null, amount: 0, auto: true, missing: true, why: 'rate', fixed: true}); }
+    else if (subtotal < minimum) { total = minimum; minimumApplied = true; }
+  }
+  return {g, lines, subtotal, minimumApplied, minimum, total: round2(total), incomplete, manualOnly, hasContent: lines.some(l => !(l.always && !(l.qty > 0)) && !(l.addon !== undefined && !(l.amount > 0)))};
+}
+function priceAll(rs){   // every active group, Base first. groups = the ones with something priced (these are copied); empty = drawn but nothing priced yet
+  rs = rs || resolveEnds(); const P = job.price, gs = new Set(activeGroups().map(Number));
+  if (+P.fee.amount > 0) gs.add(+P.fee.group || 0);
+  for (const k of Object.keys(P.manual)) if (P.manual[k].length) gs.add(+k);
+  for (const k of Object.keys(P.ovr)) if (Object.keys(P.ovr[k] || {}).length) gs.add(+k);
+  if (+job.manual.flexPipes > 0) gs.add(0);
+  const rows = [...gs].filter(g => g >= 0 && g < GROUPS.length).sort((a, b) => a - b).map(g => computePrice(g, rs));
+  const groups = rows.filter(p => p.hasContent), empty = rows.filter(p => !p.hasContent);
+  return {rows, groups, empty, combined: round2(groups.reduce((s, p) => s + (p.manualOnly ? 0 : p.total), 0)), anyHand: groups.some(p => p.manualOnly), anyInc: groups.some(p => p.incomplete)};
+}
+// Copy for Jobber: one block per group, Base first; the blocks are joined with a blank line between groups.
+// Phase 2 hook: once the scope writer's computeScope(g) is in this file, each block becomes that group's scope lines followed
+// by "Price: $X" on its own line. computeScope may hand back plain lines or its block objects ({heading, lines}); both work.
+// Merge note: the scope writer's own build also defines a copyBlocks() (scope only, no prices). Whichever lands second keeps one.
+function scopeLinesFor(g){
+  if (typeof computeScope !== 'function') return null;
+  const flat = x => typeof x === 'string' ? x.split('\n') : Array.isArray(x) ? x.flatMap(flat) : (x && Array.isArray(x.lines)) ? [x.heading || '', ...x.lines] : [];
+  return flat(computeScope(g)).map(String).filter(t => t.trim());
+}
+function copyBlocks(pa){
+  pa = pa || priceAll();
+  return pa.groups.map(p => {
+    const price = p.manualOnly ? '' : money(p.total);   // copper: the price is left blank, Ben fills it in from a live material list
+    const scope = scopeLinesFor(p.g);
+    if (!scope) return `${GROUPS[p.g].n} — ${price}`.trimEnd();
+    return [...scope, `Price: ${price}`.trimEnd()].join('\n');
+  });
+}
+function copyForJobber(){
+  const pa = priceAll();
+  if (!pa.groups.length) return toast('Nothing on the drawing to price yet');
+  const inc = pa.groups.filter(p => p.incomplete);
+  if (inc.length) {   // never hand Jobber a number with a hole in it
+    const why = inc.map(p => `${GROUPS[p.g].n}: ` + p.lines.filter(l => l.missing).map(l => `${l.label} (${MISS_WHY[l.why] || MISS_WHY.rate})`).join('; '));
+    const ov = openSheet(`<h3>Can't copy yet</h3><p>${inc.length > 1 ? 'These groups are' : 'This group is'} incomplete:</p><ul class="vlist">${why.map(w => `<li>${esc(w)}</li>`).join('')}</ul><p class="pnote">Rates come from the price book sheet; the app picks up a change the next time a job opens with signal.</p><div class="actions"><button class="btn gold" id="cpOk">OK</button></div>`);
+    ov.querySelector('#cpOk').onclick = closeSheet; return;
+  }
+  const totals = Object.fromEntries(pa.groups.map(p => [p.g, p.manualOnly ? null : p.total]));
+  copyText(copyBlocks(pa).join('\n\n')).then(ok => {
+    if (!ok) return toast("Couldn't copy — try again");
+    job.price.lastCopy = {at: Date.now(), totals, sig: pbView ? pbView.sig : '', pulledAt: pbView ? pbView.pulledAt : ''};
+    const notes = [];
+    if (pa.anyHand) notes.push('copper left blank, price it by hand');
+    if (pa.empty.length) notes.push(`${pa.empty.map(p => GROUPS[p.g].n).join(', ')} left out (nothing priced)`);
+    touch(); renderPrice(); toast(notes.length ? 'Copied — ' + notes.join('; ') : 'Copied — paste it into the Jobber quote');
+  });
+}
+function copyText(t){   // clipboard writers: Copy for Jobber, and Copy setup code on the Price Book screen
+  try { if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t).then(() => true, () => copyFallback(t)); } catch(e){}
+  return Promise.resolve(copyFallback(t));
+}
+function copyFallback(t){ const ta = document.createElement('textarea'); ta.value = t; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none'; document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, t.length); let ok = false; try { ok = document.execCommand('copy'); } catch(e){} ta.remove(); return ok; }
+const pbDate = v => { const d = new Date(v); return isNaN(d) ? '—' : d.toLocaleString('en-US', {month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit'}); };
+const pbIsOld = b => !!b && !(Date.now() - Date.parse(b.pulledAt) < PB_OLD_MS);
+function priceBreakdown(p){
+  const qtyCell = l => (l.fixed || l.chainId) ? (l.unit ? `${fmtQ(l.qty)} ${l.unit}` : '')
+    : `<input type="number" inputmode="decimal" min="0" step="any" data-pq="${esc(l.id)}" class="${l.auto ? '' : 'set'}" placeholder="${fmtQ(l.autoQty)}" value="${l.auto ? '' : fmtQ(l.qty)}"> ${l.unit === 'ft' ? 'ft' : ''}`;
+  const rateCell = l => l.byHand ? 'by hand' : l.missing ? `<span class="pmiss">${MISS_WHY[l.why] || MISS_WHY.rate}</span>` : l.waived ? 'waived' : l.formula ? 'job formula' : l.fixed ? '' : `× ${money(l.rate)}${l.unit === 'ft' ? ' /ft' : ''}`;
+  let h = `<table class="pt"><tr><th>Line</th><th>Qty</th><th class="n">Rate</th><th class="n">Amount</th></tr>`;
+  for (const l of p.lines) {
+    if (l.addon !== undefined) continue;   // add-on lines get their own editor rows below
+    const cost = l.chainId ? `<br><small>Chain cost</small> <input type="number" inputmode="decimal" min="0" step="any" data-cc="${esc(l.chainId)}" class="${l.chainCost != null ? 'set' : ''}" value="${l.chainCost != null ? l.chainCost : ''}" placeholder="type">` : '';
+    h += `<tr data-line="${esc(l.id)}" data-amount="${l.missing || l.byHand ? '' : l.amount}"><td>${esc(l.label)}${l.detail ? `<br><small>${esc(l.detail)}</small>` : ''}${cost}</td><td>${qtyCell(l)}</td><td class="n">${rateCell(l)}</td><td class="n">${l.missing || l.byHand ? '—' : money(l.amount)}</td></tr>`;
+  }
+  (job.price.manual[p.g] || []).forEach((a, i) => { h += `<tr data-line="addon:${i}"><td colspan="2"><input type="text" class="wide" data-ad="${i}" data-f="desc" value="${esc(a.desc || '')}" placeholder="Add-on: fascia, soffit, repair…"></td><td class="n"><button class="btn sm ghost" data-adx="${i}">✕</button></td><td class="n"><input type="number" inputmode="decimal" min="0" step="any" data-ad="${i}" data-f="amount" value="${+a.amount || ''}" placeholder="0"></td></tr>`; });
+  h += `<tr><td colspan="4"><button class="btn sm" data-adadd="1">+ Add-on line</button> <small>fascia, soffit, repairs, anything odd</small></td></tr>`;
+  h += `<tr><td colspan="3">Subtotal</td><td class="n">${money(p.subtotal)}</td></tr>`;
+  if (p.minimumApplied) h += `<tr><td colspan="3">Minimum job applied</td><td class="n">${money(p.total)}</td></tr>`;
+  h += `<tr><td colspan="3"><b>Total, ${esc(GROUPS[p.g].n)}</b>${p.incomplete ? ' <span class="pmiss">incomplete</span>' : ''}${p.manualOnly ? ' <span class="pmiss">Copper — price by hand from a live material list</span>' : ''}</td><td class="n">${(p.manualOnly || p.incomplete) ? '—' : money(p.total)}</td></tr>`;
+  h += `<tr><td colspan="4" class="pnote">Grey number = from the drawing. Type over a quantity to change it for this price only (the material list doesn't change); clear the box to go back.</td></tr></table>`;
+  return h;
+}
+const PR_NEWER = `<div class="pnote" id="prNewer"><b>Newer prices arrived.</b> Hide this card and show it again to use them.</div>`;
+function priceNewerNote(){   // a pull landed while the card is open: say so, but leave its numbers alone
+  const bd = document.querySelector('#mPrice .pbd'), latest = pbBook();
+  if (priceOpen && bd && pbView && latest && latest.sig !== pbView.sig && !document.getElementById('prNewer')) (bd.firstElementChild || bd).insertAdjacentHTML(bd.firstElementChild ? 'afterend' : 'afterbegin', PR_NEWER);
+}
+function renderPrice(){
+  const el = $('#mPrice'); if (!el || !job) return;
+  if (!priceOpen) {   // hidden until Ben chooses to look (F7: price comes after steps 1–4)
+    el.innerHTML = `<div class="pcard"><button class="phd" id="prToggle">Price · tap to show</button></div>`;
+    el.querySelector('#prToggle').onclick = () => { priceOpen = true; priceDetail = null; pbView = pbBook(); renderPrice(); };
+    return;
+  }
+  const head = `<button class="phd" id="prToggle">Price · tap to hide</button>`;
+  const wireHead = () => { el.querySelector('#prToggle').onclick = () => { priceOpen = false; priceDetail = null; renderPrice(); }; };
+  if (!pbView) { el.innerHTML = `<div class="pcard">${head}<div class="pbd"><b>No price book on this iPad — Jobs → Price Book</b></div></div>`; wireHead(); return; }
+  const pa = priceAll(), P = job.price, latest = pbBook();
+  const shown = p => p.manualOnly ? '<span class="pmiss">Copper — price by hand</span>' : p.incomplete ? '<span class="pmiss">incomplete</span>' : money(p.total);
+  let h = `<div class="pnote">Prices as of <span class="${pbIsOld(pbView) ? 'pold' : ''}">${esc(pbDate(pbView.pulledAt))}</span> · suggested; the final number goes in Jobber</div>`;
+  if (latest && latest.sig !== pbView.sig) h += PR_NEWER;
+  if (job.items.some(i => i.type==='text' && /tear\s*(out|off)/i.test(i.text || '')) && !job.items.some(i => i.type==='run' && !i.existing && i.tearOut))
+    h += `<div class="pnote pmiss" id="prTearNote">A "Tear out" note is on the drawing, but no run is marked "Replaces old gutter (tear off)", so tear-off isn't charged.</div>`;
+  const lc = P.lastCopy;
+  if (lc && lc.totals) {
+    const now = Object.fromEntries(pa.groups.map(p => [p.g, p.manualOnly ? null : p.total])), keys = [...new Set([...Object.keys(now), ...Object.keys(lc.totals)])].sort();
+    h += keys.some(k => now[k] !== lc.totals[k])
+      ? `<div class="pnote" id="prChanged"><b class="pmiss">Changed since you copied on ${esc(pbDate(lc.at))}.</b> Copied then: ${keys.filter(k => k in lc.totals).map(k => `${esc((GROUPS[+k] || GROUPS[0]).n)} ${lc.totals[k] == null ? 'by hand' : money(lc.totals[k])}`).join(' · ')}</div>`
+      : `<div class="pnote">Copied for Jobber on ${esc(pbDate(lc.at))}.</div>`;
+  }
+  h += `<table class="pt">`;
+  for (const p of pa.rows) {
+    const cell = p.hasContent ? shown(p) : '<span class="pnote">nothing priced · not copied</span>';
+    h += `<tr class="pg ${p.hasContent ? '' : 'pempty'} ${priceDetail === p.g ? 'on' : ''}" data-pg="${p.g}" data-total="${(p.manualOnly || p.incomplete || !p.hasContent) ? '' : p.total}"><td>${esc(GROUPS[p.g].n)}${p.minimumApplied ? '<span class="pbadge">minimum applied</span>' : ''}</td><td class="n">${cell}</td><td class="n" style="width:28px">${priceDetail === p.g ? '▾' : '›'}</td></tr>`;
+    if (priceDetail === p.g) h += `<tr><td colspan="3" class="pdet">${priceBreakdown(p)}</td></tr>`;
+  }
+  if (!pa.rows.length) h += `<tr><td colspan="3">Nothing on the drawing to price yet.</td></tr>`;
+  else if (pa.groups.length > 1) h += `<tr class="pcomb" data-comb="${(pa.anyInc || pa.anyHand) ? '' : pa.combined}"><td>Combined</td><td class="n">${pa.anyInc ? '<span class="pmiss">incomplete</span>' : pa.anyHand ? `${money(pa.combined)} <small>+ copper by hand</small>` : money(pa.combined)}</td><td></td></tr>`;
+  h += `</table>`;
+  h += `<div class="prow"><b>Difficulty fee</b> <input type="number" inputmode="decimal" min="0" step="any" id="prFee" value="${P.fee.amount || ''}" placeholder="0" style="width:96px"> on <select id="prFeeG">${GROUPS.map((gr, i) => `<option value="${i}" ${(+P.fee.group || 0) === i ? 'selected' : ''}>${esc(gr.n)}</option>`).join('')}</select> <input type="text" id="prFeeNote" value="${esc(P.fee.note)}" placeholder="why (optional)" style="flex:1;min-width:140px"></div>`;
+  if (job.items.some(i => i.type==='run' && !i.existing && i.tearOut)) h += `<div class="prow"><b>Tear-off</b> ${segHTML('prTear', [['0','Charge'],['1','Waive on this job']], P.tearWaived ? '1' : '0')}</div>`;
+  h += `<div class="prow"><button class="btn gold" id="prCopy">Copy for Jobber</button><span class="pnote">Base first, then each Option: one price per Jobber line item.</span></div>`;
+  el.innerHTML = `<div class="pcard">${head}<div class="pbd">${h}</div></div>`;
+  wireHead();
+  el.querySelectorAll('tr.pg').forEach(tr => tr.onclick = () => { const g = +tr.dataset.pg; priceDetail = priceDetail === g ? null : g; renderPrice(); });
+  const g = priceDetail, edited = () => { touch(); renderPrice(); };
+  el.querySelectorAll('[data-pq]').forEach(i => i.addEventListener('change', () => { const m = (P.ovr[g] ||= {}), v = i.value.trim(); if (v === '') delete m[i.dataset.pq]; else m[i.dataset.pq] = {qty: Math.max(0, +v || 0)}; if (!Object.keys(m).length) delete P.ovr[g]; edited(); }));
+  el.querySelectorAll('[data-cc]').forEach(i => i.addEventListener('change', () => { const v = i.value.trim(); if (v === '') delete P.chainCost[i.dataset.cc]; else P.chainCost[i.dataset.cc] = Math.max(0, +v || 0); edited(); }));
+  el.querySelectorAll('[data-ad]').forEach(i => i.addEventListener('change', () => { const a = (P.manual[g] || [])[+i.dataset.ad]; if (!a) return; if (i.dataset.f === 'amount') a.amount = Math.max(0, +i.value || 0); else a.desc = i.value.trim().slice(0, 120); edited(); }));
+  el.querySelectorAll('[data-adx]').forEach(b => b.onclick = () => { const arr = P.manual[g] || []; arr.splice(+b.dataset.adx, 1); if (!arr.length) delete P.manual[g]; edited(); });
+  el.querySelectorAll('[data-adadd]').forEach(b => b.onclick = () => { (P.manual[g] ||= []).push({desc: '', amount: 0}); edited(); });
+  const fee = el.querySelector('#prFee'); fee.addEventListener('change', () => { P.fee.amount = Math.max(0, +fee.value || 0); edited(); });
+  el.querySelector('#prFeeG').addEventListener('change', e => { P.fee.group = +e.target.value; edited(); });
+  el.querySelector('#prFeeNote').addEventListener('change', e => { P.fee.note = e.target.value.trim().slice(0, 120); edited(); });
+  wireSeg(el, 'prTear', v => { P.tearWaived = v === '1'; edited(); });
+  el.querySelector('#prCopy').onclick = copyForJobber;
+}
+
+/* ---------------- price book screen (Jobs → Price Book) ---------------- */
+let pbMsg = '', pbShowRates = false;
+const pbFmt = (v, unit) => typeof v !== 'number' ? '<span class="pmiss">missing</span>'
+  : unit.startsWith('$') ? money(v) + (unit === '$ each' ? ' each' : unit === '$ per length' ? ' / length' : unit === '$' ? '' : ' / ft')
+  : fmtQ(v) + (unit === 'ft' ? ' ft' : '');
+const pbNames = ids => ids.map(id => esc(PB_INFO[id] ? PB_INFO[id].label : id)).join(', ');
+function openPriceBook(){
+  const src = pbSource(), book = pbBook();
+  let h = `<div id="pbScreen"><h3>Price Book</h3>`;
+  if (!src) {
+    h += `<p style="max-width:560px">No price book on this iPad. Paste the setup code from Ben, or connect with the feed link and key. Rates change only in Ben's Google Sheet; this iPad just reads them.</p>
+      <div class="row"><label class="l">Setup code</label><textarea id="pbCodeIn" rows="2" placeholder="GSPB1.…" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea></div>
+      <div class="row"><button class="btn gold" id="pbPaste">Paste setup code</button></div>
+      <div class="row"><label class="l">Or connect · feed link</label><input type="text" id="pbUrlIn" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+      <div class="row"><label class="l">Key</label><input type="text" id="pbKeyIn" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+      <div class="row"><button class="btn" id="pbCheck">Check</button></div>`;
+  } else {
+    const kept = book ? book.unread.filter(id => typeof book.rates[id] === 'number') : [], gone = book ? PB_IDS.filter(id => typeof book.rates[id] !== 'number') : [];
+    h += `<div class="row" style="font-size:16px"><b>Connected · prices as of <span class="${pbIsOld(book) ? 'pold' : ''}">${book ? esc(pbDate(book.pulledAt)) : '—'}</span></b></div>`;
+    if (book && book.name) h += `<div class="row">${esc(book.name)}</div>`;
+    if (pbStatus && !pbStatus.ok) h += `<div class="row pmiss">Last check didn't update: ${esc(pbStatus.msg)} The prices above are still in use.</div>`;
+    if (kept.length) h += `<div class="row pnote">Kept the last good number for: ${pbNames(kept)}</div>`;
+    if (gone.length) h += `<div class="row pmiss">No number yet (blank in the sheet): ${pbNames(gone)}</div>`;
+    if (book && book.unknown.length) h += `<div class="row pnote">In the sheet but not used by this version of the app: ${book.unknown.map(esc).join(', ')}</div>`;
+    h += `<div class="row"><button class="btn ghost" id="pbRates">${pbShowRates ? 'Rates · tap to hide' : 'Rates · tap to show'}</button></div>`;
+    if (pbShowRates && book) h += `<table class="pt">${PB_SECTIONS.map(([sec, rows]) => `<tr class="psec"><td colspan="2">${esc(sec)}</td></tr>` + rows.map(([id, label, unit]) => `<tr><td>${esc(label)}${book.unread.includes(id) && typeof book.rates[id] === 'number' ? ' <small>(last good number)</small>' : ''}</td><td class="n">${pbFmt(book.rates[id], unit)}</td></tr>`).join('')).join('')}</table>`;
+    h += `<div class="actions" style="justify-content:space-between"><span><button class="btn" id="pbNow">Check now</button> <button class="btn" id="pbCopy">Copy setup code</button></span><button class="btn red" id="pbOff">Disconnect</button></div>`;
+  }
+  h += `<div class="row" id="pbMsg" style="font-weight:700">${esc(pbMsg)}</div><div class="actions"><button class="btn ghost" id="pbClose">Close</button></div></div>`;
+  const ov = openSheet(h, {style: 'min-width:min(560px,96vw)'});
+  const say = m => { pbMsg = m; const e = ov.querySelector('#pbMsg'); if (e) e.textContent = m; };
+  ov.querySelector('#pbClose').onclick = () => { pbMsg = ''; closeSheet(); };
+  const connect = async src2 => {
+    say('Checking…');
+    const r = await pbPull('connect', src2);
+    if (!r.ok) return say(r.msg);
+    pbMsg = ''; if (!pbView) pbView = pbBook(); renderPrice(); openPriceBook(); toast('Price book connected');
+  };
+  if (!src) {
+    ov.querySelector('#pbCheck').onclick = () => { const url = ov.querySelector('#pbUrlIn').value.trim(), key = ov.querySelector('#pbKeyIn').value.trim();
+      if (!pbUrlOK(url)) return say("That link isn't a price book feed. It starts with https://script.google.com/ and ends in /exec.");
+      if (!key) return say('Paste the key too.');
+      connect({url, key}); };
+    ov.querySelector('#pbPaste').onclick = async () => { const ta = ov.querySelector('#pbCodeIn'); let t = ta.value.trim();
+      if (!t && navigator.clipboard && navigator.clipboard.readText) { try { t = (await navigator.clipboard.readText()).trim(); ta.value = t; } catch(e){} }
+      if (!t) return say('Paste the setup code into the box first (press and hold, then Paste).');
+      const s2 = pbParseCode(t); if (!s2) return say("That isn't a Gutter Sketch setup code. It starts with GSPB1.");
+      connect(s2); };
+  } else {
+    ov.querySelector('#pbRates').onclick = () => { pbShowRates = !pbShowRates; openPriceBook(); };
+    ov.querySelector('#pbNow').onclick = () => { say('Checking…'); pbPull('check').then(r => { pbMsg = r.ok ? 'Checked: the price book is up to date.' : r.msg; openPriceBook(); }); };
+    ov.querySelector('#pbCopy').onclick = () => { copyText(pbSetupCode(src)).then(ok => say(ok ? 'Setup code copied. Text it to the rep. On their iPad: open Gutter Sketch from the Home Screen icon → Jobs → Price Book → Paste setup code.' : "Couldn't copy the setup code.")); };
+    ov.querySelector('#pbOff').onclick = () => confirmSheet('Disconnect the price book on this iPad? Prices stop until it is connected again.', 'Disconnect', () => { pbWrite(PB_SRC_KEY, null); pbWrite(PB_KEY, null); pbStatus = null; pbView = null; pbMsg = ''; renderPrice(); openPriceBook(); toast('Price book disconnected'); });
+  }
 }
 
 /* ---------------- export ---------------- */
@@ -1512,7 +1976,7 @@ function pdfMaterialsPages(doc){
     const hov = job.manual.hangerOv[key]; line('Hangers' + (hov!==undefined?` (override; auto ${m.hangers})`:` (${fmtLF(m.newLF)} / 2)`), hov!==undefined?hov:m.hangers);
     const gov = job.manual.geocelOv[key]; line('Geocel (tubes)' + (gov!==undefined?` (override; auto ${m.geocel})`:(m.miters?` (${m.miters} miters / 3)`:' (no miters)')), gov!==undefined?gov:m.geocel);
     line('Touch-up spray paint', m.paint ? `1 can - ${colorName(job.manual.gutterColor, job.manual.gutterCustom)}` : 0);
-    line('Splash guards' + ed('splashguard'), m.acc.splashguard); line('Splash blocks' + ed('splashblocks'), m.splashblocks); line('Rain chains' + ed('rainchains'), m.rainchains);
+    line('Splash guards' + ed('splashguard'), m.acc.splashguard); line('Splash blocks' + ed('splashblocks'), m.splashblocks); line('Bird cages' + ed('birdCages'), m.birdCages); line('Rain chains' + ed('rainchains'), m.rainchains);
     const rov = job.manual.rcKitOv[key]; line('Rain chain install kits' + (rov!==undefined?` (override; auto ${m.rcKits})`:''), rov!==undefined?rov:m.rcKits); line('Drip edge extension', m.de ? 'Yes' : 'No');
     y += 10;
   }
@@ -1601,11 +2065,12 @@ $('#tExport').onclick = openExportSheet;
 /* ---------------- jobs list ---------------- */
 function openJobs(){
   const rows = store.order.map(id => store.jobs[id]).filter(Boolean).map(j => `<div class="jobrow"><div class="jt"><b>${esc(j.customer||'(no name)')}${j.id===job.id?' <span class="tag">open</span>':''}</b><span>${esc(j.address||'—')} · ${esc(j.date)} · ${j.items.length} items, ${j.photos.length} photos</span></div><button class="btn sm" data-open="${j.id}">Open</button><button class="btn sm ghost" data-dup="${j.id}">Duplicate</button></div>`).join('');
-  const ov = openSheet(`<h3>Jobs <span class="tag">last 20 · saved on this iPad</span></h3><div class="row"><button class="btn gold" id="jbNew">+ New job</button><button class="btn ghost" id="jbClose">Close</button></div><div class="joblist">${rows||'<p>No saved jobs yet.</p>'}</div>`);
+  const ov = openSheet(`<h3>Jobs <span class="tag">last 20 · saved on this iPad</span></h3><div class="row"><button class="btn gold" id="jbNew">+ New job</button><button class="btn ghost" id="jbPrice">Price Book</button><button class="btn ghost" id="jbClose">Close</button></div><div class="joblist">${rows||'<p>No saved jobs yet.</p>'}</div>`);
   ov.querySelector('#jbClose').onclick = closeSheet;
+  ov.querySelector('#jbPrice').onclick = () => { closeSheet(); openPriceBook(); };
   ov.querySelector('#jbNew').onclick = () => { closeSheet(); flushSave(); const j = newJob(); addJobToStore(j); openJob(j.id); toast('New job'); };
   ov.querySelectorAll('[data-open]').forEach(b => b.onclick = () => { closeSheet(); flushSave(); openJob(b.dataset.open); });
-  ov.querySelectorAll('[data-dup]').forEach(b => b.onclick = async () => { closeSheet(); flushSave(); const src = store.jobs[b.dataset.dup]; const j = JSON.parse(JSON.stringify(src)); j.id = uid(); j.date = todayISO(); j.created = j.updated = Date.now();
+  ov.querySelectorAll('[data-dup]').forEach(b => b.onclick = async () => { closeSheet(); flushSave(); const src = store.jobs[b.dataset.dup]; const j = JSON.parse(JSON.stringify(src)); j.id = uid(); j.date = todayISO(); j.created = j.updated = Date.now(); if (j.price) j.price.lastCopy = null;   // a duplicate hasn't been quoted yet
     for (const ph of j.photos) { const nid = uid(); const blob = await idb.get(ph.id); if (blob) await storeImage(nid, blob); ph.id = nid; }
     if (j.bg.imgId) { const nid = 'bg_'+uid(); const blob = await idb.get(j.bg.imgId); if (blob) await storeImage(nid, blob); j.bg.imgId = nid; }
     addJobToStore(j); openJob(j.id); toast('Duplicated'); });
@@ -1616,6 +2081,7 @@ function openJobs(){
   loadStore(); await idb.open();
   if (!(store.current && store.jobs[store.current])) { const j = newJob(); addJobToStore(j); store.current = j.id; }
   resize(); openJob(store.current);
+  pbPull('start');   // also fired by openJob; the two share one request
   if (!localStorage.getItem('gs_welcomed')) { localStorage.setItem('gs_welcomed','1'); setTimeout(()=>toast('Add to Home Screen for full-screen use'), 800); }
 })();
 })();
