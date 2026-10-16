@@ -93,6 +93,7 @@ body.full #contBar{bottom:68px;z-index:9}
 #matPanel .mhead .btn{min-height:40px}
 #matPanel .mtabs{display:flex;gap:6px;flex-wrap:wrap}
 #matPanel .mtabs .btn{min-height:36px;font-size:13px;padding:0 10px;background:#0b2a5c}
+#matPanel .mtabs .btn.active{background:var(--gold);color:var(--navy)}   /* the active tab was navy text on navy */
 #matPanel .mbody{overflow:auto;padding:8px 12px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
 #matPanel.collapsed .mbody{display:none}
 @media (max-width:760px){#matPanel .mbody{grid-template-columns:1fr}}
@@ -140,6 +141,34 @@ body.full #contBar{bottom:68px;z-index:9}
 .prow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0;font-size:14px}
 .prow input,.prow select{min-height:40px;border:1px solid var(--navy);border-radius:6px;padding:4px 8px;background:#fff}
 #pbScreen textarea,#pbScreen input[type=text]{width:100%;font-family:ui-monospace,Menlo,monospace;font-size:14px}
+/* scope of work view (material panel) */
+#matPanel .mview{display:flex;gap:4px}
+#matPanel .mview .btn{min-height:36px;font-size:13px;padding:0 12px;background:#0b2a5c}
+#matPanel .mview .btn.active{background:var(--gold);color:var(--navy)}
+#matPanel .mscope{overflow:auto;padding:8px 12px}
+#matPanel.collapsed .mscope,#matPanel.scopeview .mbody,#matPanel.scopeview .mtabs,#matPanel:not(.scopeview) .mscope{display:none}
+.scTop{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.scTop h4{margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.6px;display:flex;gap:6px;align-items:center;flex:1}
+.scOpts{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;font-weight:800;margin-bottom:8px;align-items:center}
+.scOpts>span{display:flex;gap:6px;align-items:center}
+.scOpts .seg .btn{min-height:34px;font-size:12px;min-width:44px;padding:0 8px}
+.scBlocks{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px}
+.scBlock{background:#fff;border-radius:10px;border-left:8px solid var(--navy);padding:8px 10px;min-width:0}
+.scHead{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px}
+.scHead input{flex:1;min-width:140px;min-height:38px;border:1px solid var(--navy);border-radius:6px;padding:2px 8px;font-size:14px}
+.scChip{font-size:11px;font-weight:900;border-radius:6px;padding:3px 7px;letter-spacing:.4px;border:1px solid var(--navy)}
+.scHeading{font-weight:800;font-size:14px;margin:2px 0}
+.scHeading:empty{display:none}
+.scLines{font-size:14px;line-height:1.35}
+.scLines,.scLines *,.scHeading{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}   /* the global no-select rule hit each line */
+.scLine{white-space:pre-wrap}
+.scEdit{width:100%;min-height:170px;border:2px solid var(--navy);border-radius:8px;padding:6px 8px;font-size:14px;line-height:1.35}
+.scExtraL{display:flex;flex-direction:column;gap:2px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin-top:6px;color:#555}
+.scExtraL textarea{min-height:44px;border:1px solid #b9ae86;border-radius:6px;padding:4px 8px;font-size:14px;text-transform:none;letter-spacing:0;font-weight:400;color:var(--navy);resize:vertical}
+.scStale{font-size:12px;font-weight:800;color:#86090F;background:var(--cream);border-radius:6px;padding:3px 6px;margin:2px 0}
+.scWarn{font-size:12px;color:#86090F;margin:8px 0 0;padding-left:18px}
+.scWarn:empty{display:none}
+.scEmpty{font-size:14px;color:#555;padding:6px 2px}
 
 /* overlays / sheets */
 .overlay{position:fixed;inset:0;background:rgba(0,23,56,.55);display:flex;align-items:center;justify-content:center;z-index:50;padding:12px}
@@ -310,7 +339,7 @@ body.full #contBar{bottom:68px;z-index:9}
       <div id="matPanel" class="collapsed">
         <div class="mhead">
           <button class="btn" id="mToggle">▴</button>
-          <span>Material List</span>
+          <span class="mview"><button class="btn active" id="mvMat">Material List</button><button class="btn" id="mvScope">Scope</button></span>
           <span class="mtabs" id="mTabs"></span>
           <span style="flex:1"></span>
           <span class="tag">live · from drawing</span>
@@ -320,6 +349,7 @@ body.full #contBar{bottom:68px;z-index:9}
           <div class="mcol" id="mManual"></div>
           <div class="mcol" id="mPrice"></div>
         </div>
+        <div class="mscope" id="mScope"></div>
       </div>
     </div>
   </div>
@@ -410,6 +440,26 @@ const PB_SECTIONS = [
 ];
 const PB_INFO = Object.fromEntries(PB_SECTIONS.flatMap(([sec, rows]) => rows.map(([id, label, unit]) => [id, {label, unit, sec}])));
 const PB_IDS = Object.keys(PB_INFO);
+// scope of work wording — the owner's own Jobber line-item phrasing (see README v3.7). Words only; never prices.
+const SC_PROFILE = {'6" K':'6" K Seamless gutter', '7" K':'7" K Seamless gutter', '6" Half Round':'6" half round seamless gutter', 'European Box':'6" European box seamless gutter'};
+const SC_DS = {'3×4"':'3x4"', '4" Round':'4" round', '4×5"':'4x5"', '2×3"':'2x3"', 'Smooth Square':'smooth square'};
+const SC_COVER = {'ProGuard':'Pro Guard gutter covers', 'Expanded Metal Mesh':'expanded metal mesh gutter covers', 'Leaf Blaster Pro':'Leaf Blaster Pro stainless steel micro mesh gutter covers'};
+const SC_COVER_HEAD = {'ProGuard':'Pro Guard gutter covers', 'Expanded Metal Mesh':'Expanded metal mesh gutter covers', 'Leaf Blaster Pro':'Leaf Blaster Pro stainless steel micro mesh gutter covers', '':'Gutter covers'};   // heading of a covers-only option block
+const SC_GCOLOR = ['', 'yellow', 'orange', 'blue', 'green', 'purple'];   // option colors as they print on the drawing
+const SC_WORDS = ['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen','twenty'];
+const SC_STORY = {1:'one story', 1.5:'1.5 story', 2:'two story', 2.5:'2.5 story', 3:'three story'};
+const SC_HANGER = 'with internal hidden hangers with Ruspert coated high-low threaded screws spaced every 24" apart', SC_HANGER_PROF = ['6" K', '7" K'];   // K-style gutter lines name the hangers (owner's call, 15 Oct)
+const SC_WEDGE = {regular:'Install with support wedges spaced every 24" apart', steep:'Install with steep support wedges spaced every 24" apart', t:'Install with support T-wedges spaced every 24" apart'};
+const SC_SSWAY = ['The Sergeant Seamless Way:', 'Install with hidden hangers with a coated high low threaded screw spaced every 24" apart', 'Seal all gutter miters and end caps with tri polymer sealant to prevent leaks', 'Seal all facade penetrations with tri-polymer sealant to prevent water intrusion behind downspouts'];
+const SC_COLORNAME = {'to be determined':'color TBD'};
+const SC_CHAIN = [['stocked',''], ['own',' (customer provided)'], ['other',' (customer selected)']];   // rain chain type -> wording
+const SCOPE_PREF_KEYS = ['colors','ssway','covers','offer','print'];   // remembered on this iPad for the next new job
+const scopeDefaults = () => { let p = {}; try { p = JSON.parse(localStorage.getItem('gs_scope_prefs')) || {}; } catch(e){} if (typeof p !== 'object' || Array.isArray(p)) p = {};
+  const d = {areas:{}, extra:{}, colors:true, ssway:false, covers:'inline', offer:[], print:true};   // colors in the text by default (owner's call, 15 Oct)
+  for (const k of ['colors','ssway','print']) if (typeof p[k] === 'boolean') d[k] = p[k];
+  if (p.covers === 'separate') d.covers = 'separate';
+  if (Array.isArray(p.offer)) d.offer = p.offer.filter(t => typeof t === 'string');
+  return d; };
 
 /* ---------------- storage ---------------- */
 const LS_KEY = 'gs_store_v1';
@@ -533,8 +583,9 @@ function newJob(){
   return { id: uid(), customer:'', address:'', date: todayISO(), quote:'', prep: localStorage.getItem('gs_prep') || '',
     items: [], photos: [], photoSeq: 0,
     bg: {type:'grid', rot:0, imgId:null, w:0, h:0},
-    manual: {gutterColor:'', gutterCustom:'', dsColor:'', dsCustom:'', wedges:'', coverType:'', hrHangers:'', hangerOv:{}, rcKitOv:{}, geocelOv:{}, ovr:{}, flexPipes:'', geocel:'', screws:'', poDelivery:'', fascia:'', soffit:'', jchannel:'', collectorBox:'', misc:'', notes:'', straps:{}}, corners:{}, v:5,
+    manual: {gutterColor:'', gutterCustom:'', dsColor:'', dsCustom:'', wedges:'', coverType:'', hrHangers:'', hangerOv:{}, rcKitOv:{}, geocelOv:{}, ovr:{}, flexPipes:'', geocel:'', screws:'', poDelivery:'', fascia:'', soffit:'', jchannel:'', collectorBox:'', misc:'', notes:'', straps:{}}, corners:{}, v:6,
     price: newPrice(),   // price card state only (quantity fixes, fee, add-ons); rates never live in a job
+    scope: scopeDefaults(), scopeOv: {},   // scope of work: per-group area names / extra lines / settings; scopeOv = hand-edited blocks {text, gen}
     defaults: {profile:'6" K', cover:false, story:1, lend:'auto', rend:'auto', dsSize:'3×4"', dsStory:1, dsTerm:'', group:0},
     view: {tx:80, ty:140, s:1}, mode:'field', created: Date.now(), updated: Date.now() };
 }
@@ -581,8 +632,11 @@ function openJob(id){
   }
   for (const it of job.items) if (it.type==='ds' && !Array.isArray(it.seq)) it.seq = typeof it.seq==='string' ? it.seq.split('').filter(c=>c==='A'||c==='B') : [];
   if (job.v < 5) job.v = 5;   // v4 -> v5: job.price (price card state) added; new optional fields run.tearOut, ds.birdCage, chain, manual.hrHangers default to off
+  if (job.v < 6) job.v = 6;   // v5 -> v6: scope of work (job.scope, job.scopeOv); area names and extra lines start blank
+  job.scope = {...fresh.scope, ...(job.scope||{})}; job.scope.areas ||= {}; job.scope.extra ||= {}; if (!Array.isArray(job.scope.offer)) job.scope.offer = []; job.scopeOv ||= {};
   normPrice(job); pbView = pbBook();
   undoStack.length = 0; redoStack.length = 0; sel = null; multi.clear(); pendingStart = null; lastEnd = null; lastTouch = null;
+  scEditing = null; for (const k of Object.keys(scDrafts)) delete scDrafts[k];   // an unsaved scope edit never follows you into another job
   const runs = job.items.filter(i => i.type === 'run'); if (runs.length) { const r = runs[runs.length-1]; lastEnd = {x:r.x2, y:r.y2}; }
   setMode(job.mode || 'field', true);
   saveStore();
@@ -686,8 +740,8 @@ function runLabel(r, dom){
 }
 const CK = (x,y) => `${Math.round(x)},${Math.round(y)}`;
 // Resolve 'auto' run ends: a shared endpoint is a miter (inside/outside from the house shape), a loose end is an end cap.
-function resolveEnds(){
-  const runs = job.items.filter(i => i.type==='run');   // existing runs take part in corner detection (tie-ins) but get no end marks
+function resolveEnds(onlyGroups){   // onlyGroups: optional Set of group numbers — resolve corners as if only those runs existed
+  const runs = job.items.filter(i => i.type==='run' && (!onlyGroups || onlyGroups.has(i.g||0)));   // existing runs take part in corner detection (tie-ins) but get no end marks
   const res = new Map(); runs.forEach(r => res.set(r.id, r.existing ? {l:'none', r:'none'} : {l: (!r.lend||r.lend==='auto') ? 'endcap' : r.lend, r: (!r.rend||r.rend==='auto') ? 'endcap' : r.rend}));
   // 1. cluster run endpoints into nodes (shared endpoint = corner)
   const nodes = []; const nodeOf = new Map();   // "runId:1|2" -> node
@@ -1239,8 +1293,8 @@ function showMultiProps(){
   wireSeg(el,'g', v => { snapshot(); groupable.forEach(i => i.g = +v); afterItemsChanged(); showProps(); });
   wireSeg(el,'cover', v => { snapshot(); runs.forEach(r => r.cover = v==='1'); afterItemsChanged(); showProps(); });
   wireSeg(el,'de', v => { snapshot(); runs.forEach(r => r.de = v==='1'); afterItemsChanged(); showProps(); });
-  wireSeg(el,'rstatus', v => { snapshot(); runs.forEach(r => setRunStatus(r, v==='existing')); afterItemsChanged(); showProps(); });
   wireSeg(el,'tear', v => { snapshot(); nruns.forEach(r => { if (v==='1') r.tearOut = true; else delete r.tearOut; }); afterItemsChanged(); showProps(); });
+  wireSeg(el,'rstatus', v => { snapshot(); runs.forEach(r => setRunStatus(r, v==='existing')); afterItemsChanged(); showProps(); });
   wireSelAll();
   el.querySelector('#pMultiDel').onclick = () => { snapshot(); job.items = job.items.filter(i => !multi.has(i.id)); multi.clear(); afterItemsChanged(); showProps(); };
   el.querySelector('#pMultiClear').onclick = () => { multi.clear(); showProps(); render(); };
@@ -1404,14 +1458,17 @@ function validationWarnings(){
   const w = []; const n = job.items.filter(i => i.type==='run' && i.existing && i.cover && !(i.len>0)).length;
   if (n) w.push(`${n} existing run${n>1?'s have':' has'} covers but no length — the covers footage will be short`);
   if (!job.manual.gutterColor) w.push('Gutter color not chosen'); if (!job.manual.wedges) w.push('Wedges not selected (pick None if no wedges)'); if (job.items.some(i=>i.type==='ds' && i.status!=='reuse') && !job.manual.dsColor) w.push('Downspout color not chosen');
+  w.push(...scopeWarnings());   // scope of work: area names, cover type, half-round hangers, hand edits gone stale, tear-out note
   return w;
 }
 
 /* ---------------- material list ---------------- */
 let matTab = 'all';
+let matView = 'mat', scEditing = null;   // material panel view: 'mat' (material list) or 'scope' (scope of work)
+const scDrafts = {};   // unsaved Edit text per block — survives redraws until Save or Cancel
 function activeGroups(){ const s = new Set(job.items.filter(i=>i.type!=='haz').map(i=>i.g||0)); return [...s].sort(); }
 function computeMaterials(gFilter, rs, noOv){ // gFilter: 'all' or group index; rs = resolveEnds() (optional)
-  rs = rs || resolveEnds();
+  rs = gFilter==='all' ? (rs || resolveEnds()) : resolveEnds(new Set([0, +gFilter]));   // Base = base runs only; an option = base + that option (its corners onto the base count as miters)
   const inG = it => gFilter==='all' || (it.g||0)===+gFilter;
   const items = job.items.filter(i => inG(i) && !(i.type==='run' && i.existing));
   const m = {gutter:{}, coverLF:0, sgLF:0, newLF:0, hangers:0, endcaps:0, endcapL:0, endcapR:0, miterIn:0, miterOut:0, miterBay:0, miterBayIn:0, miterBayOut:0, ds:0, dsReuse:0, dsBySize:{}, dsByStory:{}, elbA:0, elbB:0, offsets:{'2"':0,'4"':0,'6"':0}, outlets:0, straps:0, acc:{splashguard:0,splashblock:0,dropoutlet:0,offset:0,dripedge:0,rainchain:0}, rainchainTerm:0, sbTerm:0, dsPieces:0, dsPiecesBySize:{}, dsExt:0, cb:0, birdCages:0, elbRound:0, offRound:{'2"':0,'4"':0,'6"':0}};
@@ -1450,6 +1507,7 @@ const storyKeys = o => Object.keys(o).sort((a,b) => (a==='LR') - (b==='LR') || a
 const fmtLF = n => (Math.round(n*10)/10) + "'";
 function renderMaterials(){
   if (!job || isField()) return;
+  if (matView==='scope') return renderScope();
   const groups = activeGroups(); const hasOpts = groups.some(g=>g>0);
   const tabs = hasOpts ? [['all','Combined'], ...groups.map(g=>[String(g), GROUPS[g].n])] : [];
   if (!tabs.find(t=>t[0]===matTab)) matTab = 'all';
@@ -1668,13 +1726,14 @@ function priceAll(rs){   // every active group, Base first. groups = the ones wi
   return {rows, groups, empty, combined: round2(groups.reduce((s, p) => s + (p.manualOnly ? 0 : p.total), 0)), anyHand: groups.some(p => p.manualOnly), anyInc: groups.some(p => p.incomplete)};
 }
 // Copy for Jobber: one block per group, Base first; the blocks are joined with a blank line between groups.
-// Phase 2 hook: once the scope writer's computeScope(g) is in this file, each block becomes that group's scope lines followed
-// by "Price: $X" on its own line. computeScope may hand back plain lines or its block objects ({heading, lines}); both work.
-// Merge note: the scope writer's own build also defines a copyBlocks() (scope only, no prices). Whichever lands second keeps one.
+// Each block is that group's scope of work as the Scope tab shows it (hand edits included), then "Price: $X" on its own line.
+// When the Scope tab writes covers as their own option, the group's covers line is added here anyway, because the price book
+// prices covers with the group. A group with no scope lines (only a fee or an add-on, say) copies as "Option 1 — $X".
+const scopeGroupBlock = g => computeScope(g).find(b => b.kind==='group');
 function scopeLinesFor(g){
-  if (typeof computeScope !== 'function') return null;
-  const flat = x => typeof x === 'string' ? x.split('\n') : Array.isArray(x) ? x.flatMap(flat) : (x && Array.isArray(x.lines)) ? [x.heading || '', ...x.lines] : [];
-  return flat(computeScope(g)).map(String).filter(t => t.trim());
+  const b = scopeGroupBlock(g); if (!b) return null;
+  const lines = [...b.lines, ...(job.scope.covers==='separate' ? scopeCoverLines(g, job.manual.coverType) : [])].map(String).filter(t => t.trim());
+  return lines.length ? [b.heading, ...lines].map(String).filter(t => t.trim()) : null;
 }
 function copyBlocks(pa){
   pa = pa || priceAll();
@@ -1692,6 +1751,11 @@ function copyForJobber(){
   if (inc.length) {   // never hand Jobber a number with a hole in it
     const why = inc.map(p => `${GROUPS[p.g].n}: ` + p.lines.filter(l => l.missing).map(l => `${l.label} (${MISS_WHY[l.why] || MISS_WHY.rate})`).join('; '));
     const ov = openSheet(`<h3>Can't copy yet</h3><p>${inc.length > 1 ? 'These groups are' : 'This group is'} incomplete:</p><ul class="vlist">${why.map(w => `<li>${esc(w)}</li>`).join('')}</ul><p class="pnote">Rates come from the price book sheet; the app picks up a change the next time a job opens with signal.</p><div class="actions"><button class="btn gold" id="cpOk">OK</button></div>`);
+    ov.querySelector('#cpOk').onclick = closeSheet; return;
+  }
+  const stale = pa.groups.filter(p => { const b = scopeGroupBlock(p.g); return b && b.stale; });
+  if (stale.length) {   // a hand-edited scope the drawing has moved past would sit next to a price that counts the new drawing
+    const ov = openSheet(`<h3>Can't copy yet</h3><p>${esc(stale.map(p => GROUPS[p.g].n).join(', '))}: the scope was edited by hand and the drawing has changed since. Open the Scope tab and tap Regenerate, or Edit and Save, then copy again.</p><div class="actions"><button class="btn gold" id="cpOk">OK</button></div>`);
     ov.querySelector('#cpOk').onclick = closeSheet; return;
   }
   const totals = Object.fromEntries(pa.groups.map(p => [p.g, p.manualOnly ? null : p.total]));
@@ -1842,10 +1906,171 @@ function openPriceBook(){
   }
 }
 
+/* ---------------- scope of work ----------------
+   Writes the scope for each Jobber line item from the drawing, in the owner's own Jobber wording (learned from typed
+   quotes and handwritten Work Agreements): one block per group (Base, Option 1–5) and, when covers are offered as
+   their own option, one block per cover type. Rule-based and deterministic — no AI, no network. Words only: no prices.
+   computeScope(gFilter) -> blocks; scopeCopyBlocks() -> [{key, g, kind, cover, heading, lines, text}] for the Scope tab's
+   Copy buttons; copyAllText(blocks) joins blocks with a blank line. The price card's Copy for Jobber reads each group's block
+   through scopeLinesFor(g). Counts follow the price card where it has one. */
+const scN = (n, one, many) => `${n} ${n===1 ? one : many}`;
+const scLF = rr => (!rr.length || rr.some(r => !(+r.len>0))) ? null : Math.round(rr.reduce((s,r) => s + (+r.len), 0)*10)/10;
+const scFt = rr => { const v = scLF(rr); return v===null ? "?'" : `${v}'`; };
+const scColor = (c, custom) => (!c || c==='no color match') ? '' : c==='custom' ? String(custom||'').trim() : (SC_COLORNAME[c] || c);
+const scLive = b => b.lines.some(l => String(l).trim());
+function scopeGroups(){ const a = activeGroups().map(Number); if (+job.manual.flexPipes > 0 && !a.includes(0)) a.unshift(0); return a; }   // a Base block appears for job-level flex pipes, like the price card
+function scopeHasCovers(g){ return job.items.some(i => i.type==='run' && (i.g||0)===g && i.cover); }
+function scopeOffer(){ const o = (job.scope.offer||[]).filter(t => COVER_TYPES.includes(t)); return o.length ? o : [job.manual.coverType || '']; }
+function scopeCoverLines(g, type, own){   // own = a covers-only option block: its heading names the product, so the line just says "gutter covers"
+  const runs = job.items.filter(i => i.type==='run' && (i.g||0)===g && i.cover), nw = runs.filter(r => !r.existing), ex = runs.filter(r => r.existing);
+  const t = own ? 'gutter covers' : (SC_COVER[type] || 'gutter covers'), L = [];
+  if (nw.length) L.push(`Install ${scFt(nw)} of ${t}`);
+  if (ex.length) L.push(ex.some(r => !(+r.len>0)) ? `Install ${t} on existing gutter` : `Install ${scFt(ex)} of ${t} on existing gutter`);   // existing runs may have no length: then no footage
+  return L;
+}
+// generated lines for one group, in the order they are typed in Jobber (gutter → wedges → tie-in → splash guards → downspouts → where the water goes → covers)
+function scopeLines(g, rs){
+  rs = rs || resolveEnds(); const mn = job.manual, sc = job.scope, inG = it => (it.g||0)===g, L = [];
+  const runs = job.items.filter(i => i.type==='run' && inG(i)), nr = runs.filter(r => !r.existing);
+  const dss = job.items.filter(i => i.type==='ds' && inG(i)), nd = dss.filter(d => d.status!=='reuse'), rd = dss.filter(d => d.status==='reuse');
+  const acc = sub => job.items.filter(i => i.type==='acc' && inG(i) && i.sub===sub).length, term = t => dss.filter(d => d.term===t).length;   // terminations, collector boxes and bird cages count on every downspout, new or reused, like the price card
+  // tear out of the old gutter this group replaces
+  const tear = nr.filter(r => r.tearOut);
+  if (tear.length) L.push(tear.length===nr.length ? 'Removal and disposal of existing gutter system' : `Removal and disposal of ${scFt(tear)} of existing gutter`);
+  // new gutter, one line per profile
+  const gc = sc.colors ? scColor(mn.gutterColor, mn.gutterCustom) : '';
+  const profs = [...PROFILES, ...new Set(nr.map(r => r.profile||'6" K').filter(p => !PROFILES.includes(p)))];
+  for (const p of profs) { const rr = nr.filter(r => (r.profile||'6" K')===p); if (!rr.length) continue;
+    let s = `Install ${scFt(rr)} of ${SC_PROFILE[p] || p + ' seamless gutter'}`;
+    if (p==='6" Half Round' && mn.hrHangers) s += mn.hrHangers==='external' ? ' with external stamped hangers' : ' with internal hidden hangers';
+    if (SC_HANGER_PROF.includes(p)) s += ' ' + SC_HANGER;
+    L.push(s + (gc ? ' - ' + gc : '')); }
+  if (nr.length && SC_WEDGE[mn.wedges]) L.push(SC_WEDGE[mn.wedges]);
+  const joins = c => nr.some(r => [[r.x1, r.y1, 'l'], [r.x2, r.y2, 'r']].some(([x, y, k]) => dist(x, y, c.x, c.y) < 3 && (rs.ends.get(r.id) || {})[k] !== 'endcap'));   // an end set to End cap there is not joined
+  if (rs.corners.some(c => c.tiein && c.groups.includes(g) && joins(c))) L.push('Tie into existing gutter system');   // straight joins to existing gutter count too
+  const sg = acc('splashguard'); if (sg) L.push(`Install ${scN(sg, 'splash guard', 'splash guards')}`);
+  const dout = acc('dropoutlet'); if (dout) L.push(`Install ${scN(dout, 'drop outlet', 'drop outlets')} draining onto the lower roof`);
+  // new downspouts: by story (one, 1.5, two, 2.5, three), then lower roof; story words only when the stories are mixed
+  const dc = sc.colors ? scColor(mn.dsColor, mn.dsCustom) : '', tail = sz => ` - ${SC_DS[sz] || sz}${dc ? ', ' + dc : ''}`;
+  const pipe = nd.filter(d => d.term!=='rainchain');   // a rain chain takes the pipe's place, as on the price card
+  const real = pipe.filter(d => d.story!=='LR'), mixed = real.some(d => +(d.story||1)!==1);
+  const sizes = [...DS_SIZES, ...new Set(pipe.map(d => d.size||'3×4"').filter(s => !DS_SIZES.includes(s)))];
+  const stories = [...new Set(real.map(d => +(d.story||1)))].sort((a,b) => a-b);
+  for (const st of stories) for (const sz of sizes) { const n = real.filter(d => +(d.story||1)===st && (d.size||'3×4"')===sz).length; if (!n) continue;
+    const cnt = (st % 1 && n < SC_WORDS.length) ? SC_WORDS[n] : n;   // "Install two 1.5 story downspouts", never "2 1.5 story"
+    L.push(`Install ${cnt} ${mixed ? (SC_STORY[st] || st + ' story') + ' ' : ''}${n===1 ? 'downspout' : 'downspouts'}${tail(sz)}`); }
+  for (const sz of sizes) { const n = pipe.filter(d => d.story==='LR' && (d.size||'3×4"')===sz).length; if (n) L.push(`Install ${scN(n, 'downspout', 'downspouts')} draining to the lower roof${tail(sz)}`); }
+  const cb = dss.filter(d => d.cb).length; if (cb) L.push(`Install ${scN(cb, 'collector box', 'collector boxes')}`);
+  const ru = rd.filter(d => d.term!=='rainchain').length; if (ru) L.push(`Reuse ${scN(ru, 'existing downspout', 'existing downspouts')}`);   // a rain chain takes the old pipe's place
+  // where the water goes
+  const dr = term('drain'); if (dr) L.push(`Connect ${scN(dr, 'downspout', 'downspouts')} to ${dr===1 ? 'an underground drain' : 'underground drains'}`);
+  const dw = term('driveway'); if (dw) L.push(`Drain ${scN(dw, 'downspout', 'downspouts')} onto the driveway`);
+  const ext = term('extension'); if (ext) L.push(`Add ${scN(ext, 'downspout extension', 'downspout extensions')}`);
+  const sb = acc('splashblock') + term('splashblock'); if (sb) L.push(`Add ${scN(sb, 'splash block', 'splash blocks')}`);
+  const bc = dss.filter(d => d.birdCage).length; if (bc) L.push(`Add ${scN(bc, 'bird cage', 'bird cages')}`);
+  const fp = g===0 ? Math.round(+mn.flexPipes||0) : 0; if (fp > 0) L.push(`Add ${scN(fp, 'flex pipe', 'flex pipes')}`);   // job-level count: on the Base, like the price card
+  const chains = [...job.items.filter(i => i.type==='acc' && inG(i) && i.sub==='rainchain'), ...dss.filter(d => d.term==='rainchain')];
+  for (const [t, note] of SC_CHAIN) { const n = chains.filter(c => (c.chain||'stocked')===t).length; if (n) L.push(`Install ${scN(n, 'rainchain', 'rainchains')}${note}`); }
+  // drip edge, then covers (unless covers are written as their own option)
+  const de = runs.filter(r => r.de); if (de.length || acc('dripedge')) { const v = scLF(de); L.push(v ? `Add ${v}' of drip edge extension` : 'Add drip edge extension'); }
+  if (sc.covers!=='separate') L.push(...scopeCoverLines(g, mn.coverType));
+  // lines typed for this block, then the optional standards block
+  for (const l of String(sc.extra[g]||'').split('\n')) if (l.trim()) L.push(l.trim());
+  if (sc.ssway && nr.length) L.push('', ...SC_SSWAY.filter((l, i) => !(i===1 && nr.some(r => SC_HANGER_PROF.includes(r.profile||'6" K')))));   // the gutter line already names the hidden hangers
+  return L;
+}
+function scopeHeading(g){ const a = String(job.scope.areas[g]||'').trim(); return g ? `${a || GROUPS[g].n} - ${SC_GCOLOR[g]} on drawing` : a; }
+function scopeCoverHeading(g, t, ref){ const h = SC_COVER_HEAD[t] || SC_COVER_HEAD['']; if (!ref) return h; const a = String(job.scope.areas[g]||'').trim(); return `${h} - ${g ? `${a || GROUPS[g].n} (${SC_GCOLOR[g]})` : (a || 'Base')}`; }
+function scopeBlock(key, g, kind, cover, heading, gen){
+  const ov = job.scopeOv[key], genText = gen.join('\n');
+  if (ov && typeof ov.text==='string') { const lines = ov.text.replace(/\s+$/, '').split('\n').map(s => s.replace(/\s+$/, '')); while (lines.length && !lines[0].trim()) lines.shift(); return {key, g, kind, cover, heading, gen, lines, edited:true, stale: ov.gen!==genText}; }
+  return {key, g, kind, cover, heading, gen, lines: gen, edited:false, stale:false};
+}
+// gFilter: 'all' (every group, Jobber order) or one group number. Blocks may be empty (nothing drawn yet) — exports and copy skip those.
+function computeScope(gFilter){
+  const rs = resolveEnds(), all = scopeGroups(), groups = (gFilter===undefined || gFilter==='all') ? all : [+gFilter];
+  const sep = job.scope.covers==='separate', covG = all.filter(scopeHasCovers), out = [];
+  for (const g of groups) {
+    out.push(scopeBlock('g' + g, g, 'group', null, scopeHeading(g), scopeLines(g, rs)));
+    if (sep && covG.includes(g)) for (const t of scopeOffer()) out.push(scopeBlock(`c${g}:${t}`, g, 'covers', t, scopeCoverHeading(g, t, covG.length > 1 || g > 0), scopeCoverLines(g, t, true)));
+  }
+  return out;
+}
+function scopeLabel(b){ return b.kind==='covers' ? `COVERS${b.cover ? ' · ' + b.cover.toUpperCase() : ''}${b.g ? ' · OPTION ' + b.g : ''}` : (b.g ? `OPTION ${b.g}` : 'BASE'); }
+function scopeCopyBlocks(){ return computeScope('all').filter(scLive).map(b => ({key:b.key, g:b.g, kind:b.kind, cover:b.cover, heading:b.heading, lines:[...b.lines], text:[b.heading, ...b.lines].filter((s,i) => i>0 || s).join('\n')})); }
+function copyAllText(blocks){ return (blocks || scopeCopyBlocks()).map(b => b.text).join('\n\n'); }
+function scopeWarnings(){
+  const w = [], blocks = computeScope('all'), live = blocks.filter(scLive);
+  if (live.filter(b => b.kind==='group').length > 1) for (const b of live) if (b.kind==='group' && job.items.some(i => i.type==='run' && !i.existing && (i.g||0)===b.g) && !String(job.scope.areas[b.g]||'').trim())
+    w.push(b.g ? `${GROUPS[b.g].n} has no area name — its scope heading will read "${scopeHeading(b.g)}"` : 'Base has no area name — the Base scope block has no heading');
+  if (job.items.some(i => i.type==='run' && i.cover) && !job.manual.coverType && !(job.scope.covers==='separate' && (job.scope.offer||[]).length)) w.push('Gutter cover type not chosen — the scope just says "gutter covers"');
+  if (job.items.some(i => i.type==='run' && !i.existing && i.profile==='6" Half Round') && !job.manual.hrHangers) w.push('Half round hangers not chosen (internal or external) — the scope leaves them out');
+  for (const b of blocks) if (b.stale) w.push(`${scopeLabel(b)} scope was hand-edited and the drawing has changed since — check it, or tap Regenerate`);
+  if (job.items.some(i => i.type==='ds' && i.term==='rainchain')) w.push('A downspout is still marked "Rain chain" from an older version — the scope writes it as a rain chain; give it a real termination or swap it for a rain chain icon');
+  if (job.items.some(i => i.type==='text' && /tear\s*(out|off)/i.test(i.text||'')) && !job.items.some(i => i.type==='run' && !i.existing && i.tearOut)) w.push('A "Tear out" note is on the drawing but no run is marked "Replaces old gutter" — the scope will not mention tear out');
+  return w;
+}
+async function scopeCopy(t){   // Scope tab: true = copied; null = the iPad refused both ways, so the text is shown in a sheet to copy by hand
+  if (await copyText(t)) return true;
+  const ov = openSheet(`<h3>Copy this text</h3><div class="row" style="font-size:14px">The iPad didn't allow an automatic copy. Press and hold in the box, tap Select All, then Copy.</div><div class="row"><textarea class="scEdit" id="cpBox">${esc(t)}</textarea></div><div class="actions"><button class="btn gold" id="cpDone">Done</button></div>`);
+  const ta = ov.querySelector('#cpBox'); try { ta.focus(); ta.select(); ta.setSelectionRange(0, ta.value.length); } catch(e){} ov.querySelector('#cpDone').onclick = closeSheet; return null;   // box is not readonly: the iPad only offers Select All in an editable box
+}
+function setMatView(v){
+  matView = v; const p = $('#matPanel'); p.classList.toggle('scopeview', v==='scope'); $('#mvMat').classList.toggle('active', v==='mat'); $('#mvScope').classList.toggle('active', v==='scope');
+  if (p.classList.contains('collapsed')) { p.classList.remove('collapsed'); $('#mToggle').textContent = '▾'; }
+  scEditing = null; renderMaterials();
+}
+$('#mvMat').onclick = () => setMatView('mat'); $('#mvScope').onclick = () => setMatView('scope');
+const scLinesHTML = b => b.lines.map(l => `<div class="scLine">${String(l).trim() ? esc(l) : '&nbsp;'}</div>`).join('') || '<div class="scLine" style="color:#888">Nothing drawn in this group yet — type extra lines below, or draw.</div>';
+function refreshScopeText(){ const el = $('#mScope'); if (!el) return;   // update text in place (inputs keep focus while typing)
+  let any = false;
+  for (const b of computeScope('all')) { const hd = el.querySelector(`[data-hd="${b.key}"]`); if (hd) hd.textContent = b.heading; const ln = el.querySelector(`[data-ln="${b.key}"]`); if (ln) ln.innerHTML = scLinesHTML(b); const cp = el.querySelector(`[data-copy="${b.key}"]`); if (cp) cp.style.display = scLive(b) ? '' : 'none'; any = any || scLive(b); }
+  const ca = el.querySelector('#scCopyAll'); if (ca) ca.style.display = any ? '' : 'none';
+  const wl = el.querySelector('#scWarn'); if (wl) wl.innerHTML = scopeWarnings().map(s => `<li>${esc(s)}</li>`).join(''); }
+function renderScope(){
+  if (!job || isField()) return; const el = $('#mScope'); const sc = job.scope, blocks = computeScope('all'), anyCov = activeGroups().some(scopeHasCovers);
+  if (scEditing && !blocks.find(b => b.key===scEditing)) scEditing = null;
+  const segS = (name, opts, val) => segHTML(name, opts, val);
+  let h = `<div class="scTop"><h4>Scope of work <span class="tag">one block per Jobber line item</span></h4><button class="btn gold sm" id="scCopyAll" style="${blocks.some(scLive) ? '' : 'display:none'}">Copy all</button></div>`;
+  h += `<div class="scOpts"><span>Colors in text ${segS('scColors', [['0','Off'],['1','On']], sc.colors?'1':'0')}</span><span>Sergeant Seamless Way ${segS('scSsway', [['0','Off'],['1','On']], sc.ssway?'1':'0')}</span><span>Print on drawing ${segS('scPrint', [['0','Off'],['1','On']], sc.print===false?'0':'1')}</span>`;
+  if (anyCov) { h += `<span>Covers ${segS('scCovers', [['inline','With the gutter'],['separate','Own option']], sc.covers==='separate'?'separate':'inline')}</span>`;
+    if (sc.covers==='separate') { const off = scopeOffer(); h += `<span>Offer <span class="seg">${COVER_TYPES.map(t => `<button class="btn ${off.includes(t)?'active':''}" data-offer="${esc(t)}">${esc(t)}</button>`).join('')}</span></span>`; } }
+  h += `</div>`;
+  if (!blocks.length) h += `<div class="scEmpty">Nothing to write yet — draw the job and the scope fills in here.</div>`;
+  h += `<div class="scBlocks">` + blocks.map(b => {
+    const c = GROUPS[b.g].c, isEd = scEditing===b.key;
+    let x = `<div class="scBlock" data-key="${b.key}" style="border-left-color:${c}"><div class="scHead"><span class="scChip" style="background:${c};color:${b.g===1?NAVY:'#fff'}">${esc(scopeLabel(b))}</span>`;
+    x += b.kind==='group' ? `<input class="scArea" data-area="${b.g}" value="${esc(sc.areas[b.g]||'')}" placeholder="${b.g ? 'Area name (e.g. Rear porch)' : 'Area name (optional)'}" autocomplete="off">` : '<span style="flex:1"></span>';
+    if (!isEd) x += `<button class="btn sm gold" data-copy="${b.key}" style="${scLive(b) ? '' : 'display:none'}">Copy</button><button class="btn sm ghost" data-edit="${b.key}">Edit</button>${b.edited ? `<button class="btn sm ghost" data-regen="${b.key}">Regenerate</button>` : ''}`;
+    x += `</div><div class="scHeading" data-hd="${b.key}">${esc(b.heading)}</div>`;
+    if (b.stale) x += `<div class="scStale">The drawing or scope settings changed after this block was edited — check it, or tap Regenerate.</div>`;
+    if (isEd) x += `<textarea class="scEdit" id="scEditBox">${esc(scDrafts[b.key] ?? b.lines.join('\n'))}</textarea><div class="actions"><button class="btn ghost sm" id="scEdCancel">Cancel</button><button class="btn gold sm" id="scEdSave">Save</button></div>`;
+    else x += `<div class="scLines" data-ln="${b.key}">${scLinesHTML(b)}</div>`;
+    if (b.kind==='group' && !b.edited && !isEd) x += `<label class="scExtraL">Extra lines for this block<textarea data-extra="${b.g}" rows="2" placeholder="Anything the drawing can't say — one line each">${esc(sc.extra[b.g]||'')}</textarea></label>`;
+    return x + `</div>`;
+  }).join('') + `</div>`;
+  h += `<ul class="scWarn" id="scWarn">${scopeWarnings().map(s => `<li>${esc(s)}</li>`).join('')}</ul>`;
+  el.innerHTML = h;
+  const pref = (k, v) => { job.scope[k] = v; if (SCOPE_PREF_KEYS.includes(k)) { let p = {}; try { p = JSON.parse(localStorage.getItem('gs_scope_prefs')||'{}'); } catch(e){} if (!p || typeof p !== 'object' || Array.isArray(p)) p = {}; p[k] = v; try { localStorage.setItem('gs_scope_prefs', JSON.stringify(p)); } catch(e){} } touch(); renderScope(); };
+  const wireSc = (name, fn) => { const s = el.querySelector(`[data-seg="${name}"]`); if (s) s.addEventListener('click', e => { const b = e.target.closest('button'); if (b) fn(b.dataset.v); }); };
+  wireSc('scColors', v => pref('colors', v==='1')); wireSc('scSsway', v => pref('ssway', v==='1')); wireSc('scPrint', v => pref('print', v==='1')); wireSc('scCovers', v => pref('covers', v));
+  el.querySelectorAll('[data-offer]').forEach(b => b.onclick = () => { const t = b.dataset.offer; let o = scopeOffer().filter(Boolean); o = o.includes(t) ? o.filter(x => x!==t) : [...o, t]; pref('offer', COVER_TYPES.filter(x => o.includes(x))); });
+  el.querySelectorAll('[data-area]').forEach(inp => inp.addEventListener('input', () => { job.scope.areas[inp.dataset.area] = inp.value; touch(); refreshScopeText(); }));
+  el.querySelectorAll('[data-extra]').forEach(ta => ta.addEventListener('input', () => { job.scope.extra[ta.dataset.extra] = ta.value; touch(); refreshScopeText(); }));
+  el.querySelectorAll('[data-copy]').forEach(b => b.onclick = async () => { const bl = scopeCopyBlocks().find(x => x.key===b.dataset.copy); if (!bl) return; if (await scopeCopy(bl.text)) toast(`${scopeLabel(bl)} copied — paste into the Jobber line item`); });
+  const ca = el.querySelector('#scCopyAll'); if (ca) ca.onclick = async () => { if (await scopeCopy(copyAllText())) toast('Whole scope copied (blocks separated by a blank line)'); };
+  el.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => { scEditing = b.dataset.edit; renderScope(); const ta = $('#scEditBox'); if (ta) ta.focus(); });
+  const eb = el.querySelector('#scEditBox'); if (eb) eb.addEventListener('input', () => { scDrafts[scEditing] = eb.value; });
+  el.querySelectorAll('[data-regen]').forEach(b => b.onclick = () => { delete job.scopeOv[b.dataset.regen]; touch(); renderScope(); toast('Back to the scope written from the drawing'); });
+  const sv = el.querySelector('#scEdSave'); if (sv) sv.onclick = () => { const b = computeScope('all').find(x => x.key===scEditing), t = el.querySelector('#scEditBox').value;
+    if (b) { if (t.trim()===b.gen.join('\n').trim()) delete job.scopeOv[b.key]; else job.scopeOv[b.key] = {text:t, gen:b.gen.join('\n')}; delete scDrafts[b.key]; } scEditing = null; touch(); renderScope(); };
+  const cn = el.querySelector('#scEdCancel'); if (cn) cn.onclick = () => { delete scDrafts[scEditing]; scEditing = null; renderScope(); };
+}
+
 /* ---------------- export ---------------- */
 function sceneBBox(){
   let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity; const add=(x,y)=>{ if(x<x0)x0=x; if(y<y0)y0=y; if(x>x1)x1=x; if(y>y1)y1=y; };
-  for (const it of job.items) { if (it.type==='run') { add(it.x1,it.y1); add(it.x2,it.y2); } else if (it.type==='ink') it.pts.forEach(q=>add(q[0],q[1])); else if (it.type==='text' || it.type==='tag') { const ex = it.type==='text' ? (String(it.text||'').split(/\n+/).filter(Boolean).length-1)*8 : 0; add(it.x-60,it.y-15-ex); add(it.x+60,it.y+15+ex); if (it.lx!==undefined) add(it.lx,it.ly); (it.ptrs||[]).forEach(q => add(q[0],q[1])); } else { add(it.x-25,it.y-25); add(it.x+25,it.y+35); } }
+  for (const it of job.items) { if (it.type==='run') { add(it.x1,it.y1); add(it.x2,it.y2); } else if (it.type==='ink') it.pts.forEach(q=>add(q[0],q[1])); else if (it.type==='text' || it.type==='tag') { const ex = it.type==='text' ? (String(it.text||'').split(/\n+/).filter(Boolean).length-1)*8 : 0; add(it.x-60,it.y-15-ex); add(it.x+60,it.y+15+ex); if (it.lx!==undefined) add(it.lx,it.ly); (it.ptrs||[]).forEach(q => add(q[0],q[1])); } else if (it.type==='ds') { add(it.x-70,it.y-30); add(it.x+70,it.y+35); } else { add(it.x-25,it.y-25); add(it.x+25,it.y+35); } }
   for (const p of job.photos) add(p.x,p.y);
   const fp = bgFootprint(); if (fp) { add(fp.x,fp.y); add(fp.x+fp.w,fp.y+fp.h); }
   if (x0===Infinity) { x0=0;y0=0;x1=400;y1=300; }
@@ -1947,26 +2172,110 @@ function drawLegend(p, text, measure, ly){
   for (const row of rows) { for (const it of row) { legendGlyph(p, it.key, M + it.x, ly-3); text(it.label, M + it.x + LG_GLYPH + LG_GAP, ly, false); } ly += LG_ROW; }
   return ly;
 }
+// ---- scope of work on the exports: 1–3 columns, the largest font that fits; never over the legend; page 2 if it can't fit
+const SC_TITLE_H = 14;
+const optLegendText = g => { const a = String(job.scope.areas[g]||'').trim(), many = activeGroups().filter(x => x>0).length > 3; return `${g} = ${a && !many ? (a.length > 22 ? a.slice(0,21) + '…' : a) : GROUPS[g].n}`; };   // OPTIONS row on the drawing uses the scope area names (up to 3 options, so the row fits)
+function scopePrintBlocks(){ return computeScope('all').filter(scLive); }
+function scWrap(t, maxW, measure, s, bold){   // word wrap; a word wider than the column is split so it never runs into the next column
+  const out = []; let cur = '';
+  for (let w of String(t).split(/\s+/).filter(Boolean)) {
+    while (measure(w, s, bold) > maxW && w.length > 1) { let k = w.length - 1; while (k > 1 && measure(w.slice(0, k), s, bold) > maxW) k--; if (cur) { out.push(cur); cur = ''; } out.push(w.slice(0, k)); w = w.slice(k); }
+    const tr = cur ? cur + ' ' + w : w; if (!cur || measure(tr, s, bold) <= maxW) cur = tr; else { out.push(cur); cur = w; } }
+  if (cur) out.push(cur); return out.length ? out : ['']; }
+function scopeFlow(blocks, measure, W, s, k){   // flow the blocks top-to-bottom, left-to-right into k columns of equal height
+  const gap = 14, colW = (W - gap*(k-1))/k, lh = s*1.28, chip = s*0.8, rows = [];
+  for (const b of blocks) {
+    scWrap(b.heading || (b.kind==='covers' ? 'Gutter covers' : 'Base'), colW - chip - 4, measure, s, true).forEach((t, i) => rows.push({text:t, bold:true, chip: i===0 ? b.g : null, ind: chip + 4, h: lh, keep: true}));
+    for (const l of b.lines) { if (!String(l).trim()) { rows.push({text:'', h: lh*0.5}); continue; } scWrap(l, colW - 8, measure, s, false).forEach((t, i) => rows.push({text:t, ind: i ? 8 : 0, h: lh})); }
+    rows.push({text:'', h: s*0.7, gap: true});
+  }
+  while (rows.length && rows[rows.length-1].gap) rows.pop();
+  if (!rows.length) return null;
+  const fill = H => { const cols = [[]]; let y = 0;
+    for (let i = 0; i < rows.length; i++) { const r = rows[i]; let need = r.h;
+      if (r.keep) { let j = i + 1; while (rows[j] && rows[j].keep) need += rows[j++].h; if (rows[j] && !rows[j].gap) need += rows[j].h; }   // a heading never ends a column
+      if (y > 0 && y + need > H + 0.01) { if (r.gap) continue; cols.push([]); y = 0; }
+      cols[cols.length-1].push({...r, y}); y += r.h; }
+    return cols; };
+  let lo = Math.max(...rows.map(r => r.h)), hi = rows.reduce((a, r) => a + r.h, 0) + 1;
+  for (let it = 0; it < 28; it++) { const mid = (lo + hi)/2; if (fill(mid).length <= k) hi = mid; else lo = mid; }
+  const cols = fill(hi), out = []; let h = 0;
+  cols.forEach((c, ci) => { for (const r of c) if (r.text) out.push({cx: ci*(colW + gap), x: r.ind||0, y: r.y, text: r.text, bold: !!r.bold, chip: r.chip}); const last = c[c.length-1]; if (last) h = Math.max(h, last.y + last.h); });
+  return {s, k, h: h + SC_TITLE_H, lh, rows: out};
+}
+function scopeLayout(blocks, measure, W, maxH, sizes, force){   // largest font that fits maxH; fewer columns unless more save 15% height
+  sizes = sizes || [10, 9.5, 9, 8.5, 8, 7.5, 7]; let last = null;
+  for (const s of sizes) { let best = null;
+    for (const k of [1, 2, 3]) { const r = scopeFlow(blocks, measure, W, s, k); if (!r) continue; if (!last || r.h < last.h) last = r; if (r.h <= maxH && (!best || r.h < best.h*0.85)) best = r; }
+    if (best) return best; }
+  return force ? last : null;
+}
+function drawScopeOn(R, lay, x0, y0, W, own){   // R = painter: rule / text / chip, in page points; own = the page is titled SCOPE OF WORK already
+  if (!own) { R.rule(x0, y0, W); R.text('SCOPE OF WORK', x0, y0 + 10.5, 8.5, true); }
+  const top = y0 + SC_TITLE_H;
+  for (const r of lay.rows) { if (r.chip!==null && r.chip!==undefined) { const cs = lay.s*0.72; R.chip(x0 + r.cx, top + r.y + (lay.lh - cs)/2, cs, r.chip); } R.text(r.text, x0 + r.cx + r.x, top + r.y + lay.s*0.98, lay.s, r.bold); }
+}
+const pdfSafe = t => String(t).replace(/[^\t\n\r\x20-\x7E\xA0-\xFF\u2018\u2019\u201C\u201D\u2013\u2014\u2026\u2022]/g, ch => ch.normalize('NFKD').replace(/[^\x20-\x7E\xA0-\xFF]/g, ''));   // the PDF's built-in font can't draw emoji and the like (accented letters keep their base letter)
+const newPdf = () => { const doc = new window.jspdf.jsPDF({unit:'pt', format:'letter', compress:true});   // every string that reaches the PDF goes through pdfSafe
+  for (const k of ['text', 'getTextWidth', 'splitTextToSize']) { const f = doc[k].bind(doc); doc[k] = (t, ...a) => f(Array.isArray(t) ? t.map(pdfSafe) : pdfSafe(t), ...a); }
+  return doc; };
+const pdfMeasure = doc => (t, s, b) => { doc.setFont('helvetica', b?'bold':'normal'); doc.setFontSize(s); return doc.getTextWidth(pdfSafe(t)); };
+const pdfScopeR = doc => ({ rule:(x,y,w) => { doc.setFillColor(...RGB.gold); doc.rect(x, y, w, 1.6, 'F'); }, text:(t,x,y,s,b) => { doc.setFont('helvetica', b?'bold':'normal'); doc.setFontSize(s); doc.setTextColor(...RGB.navy); doc.text(pdfSafe(t), x, y); },
+  chip:(x,y,s,g) => { const c = GROUPS[g].c; doc.setFillColor(parseInt(c.slice(1,3),16), parseInt(c.slice(3,5),16), parseInt(c.slice(5,7),16)); doc.setDrawColor(...RGB.navy); doc.setLineWidth(0.6); doc.rect(x, y, s, s, 'FD'); } });
+const cvMeasure = x => (t, s, b) => { x.font = `${b?700:400} ${s}px Helvetica,Arial`; return x.measureText(t).width; };
+const cvScopeR = x => ({ rule:(px,py,w) => { x.fillStyle = 'rgb(255,206,52)'; x.fillRect(px, py, w, 1.6); }, text:(t,px,py,s,b) => { x.font = `${b?700:400} ${s}px Helvetica,Arial`; x.fillStyle = 'rgb(0,23,56)'; x.textAlign = 'left'; x.textBaseline = 'alphabetic'; x.fillText(t, px, py); },
+  chip:(px,py,s,g) => { x.fillStyle = GROUPS[g].c; x.fillRect(px, py, s, s); x.strokeStyle = 'rgb(0,23,56)'; x.lineWidth = 0.6; x.strokeRect(px, py, s, s); } });
+const SC_PAGE_SIZES = [10, 9.5, 9, 8.5, 8, 7.5, 7, 6.5, 6];
+function scopeForDrawing(measure, legendH){   // the scope block under the drawing: {lay, h} fits, {overflow, h} goes to page 2, {h:0} none
+  const blocks = job.scope.print===false ? [] : scopePrintBlocks(); if (!blocks.length) return {h:0, blocks};
+  const lay = scopeLayout(blocks, measure, PW-2*M, (FRAME.footerRule - 10 - FRAME.bodyTop - legendH)*0.45);
+  return lay ? {lay, h: lay.h + 9, blocks} : {overflow:true, h:18, blocks};
+}
 function pdfDrawingPage(doc){
   const {navy,maroon} = RGB; const groups = activeGroups().filter(g=>g>0);
   const legendH = 12 + (groups.length?14:0) + legendRowCount()*LG_ROW + 12;
-  const area = {x:M, y:FRAME.bodyTop, w:PW-2*M, h:FRAME.footerRule - 10 - legendH - FRAME.bodyTop};
+  const sc = scopeForDrawing(pdfMeasure(doc), legendH);
+  const area = {x:M, y:FRAME.bodyTop, w:PW-2*M, h:FRAME.footerRule - 10 - legendH - sc.h - FRAME.bodyTop};
   doc.setDrawColor(...navy); doc.setLineWidth(1); doc.rect(area.x,area.y,area.w,area.h);
   const bb = sceneBBox(); const k = Math.min(area.w/bb.w, area.h/bb.h); const ox = area.x + (area.w - bb.w*k)/2, oy = area.y + (area.h - bb.h*k)/2;
   const fp = bgFootprint(); if (fp) { try { doc.addImage(rotatedBgDataURL(), 'JPEG', ox+(fp.x-bb.x)*k, oy+(fp.y-bb.y)*k, fp.w*k, fp.h*k, undefined, 'FAST'); } catch(e){} }
   const rs = resolveEnds(); const p = pdfPainter(doc, ox, oy, bb.x, bb.y, k); const o = {field:false, isSel: () => false, invalid:new Set(), ends: rs.ends, dom: dominantProfile(), placed: []}; drawScene(p,o); drawPins(p,o);
   let ly = area.y+area.h+14, lx = M; doc.setFontSize(8.5); doc.setFont('helvetica','bold'); doc.setTextColor(...navy);
-  if (groups.length) { doc.text('OPTIONS:', lx, ly); lx += 48; for (const g of groups) { const c=GROUPS[g].c; doc.setFillColor(parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16)); doc.setDrawColor(...navy); doc.rect(lx, ly-7, 10, 10, 'FD'); doc.setFont('helvetica','normal'); doc.text(`${g} = ${GROUPS[g].n}`, lx+14, ly); lx += 14 + doc.getTextWidth(`${g} = ${GROUPS[g].n}`) + 14; } ly += 14; }
+  if (groups.length) { doc.text('OPTIONS:', lx, ly); lx += 48; for (const g of groups) { const c=GROUPS[g].c; doc.setFillColor(parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16)); doc.setDrawColor(...navy); doc.rect(lx, ly-7, 10, 10, 'FD'); doc.setFont('helvetica','normal'); const t = pdfSafe(optLegendText(g)); doc.text(t, lx+14, ly); lx += 14 + doc.getTextWidth(t) + 14; } ly += 14; }
   { const lp = pdfPainter(doc, 0, 0, 0, 0, 1); const meas = t => { doc.setFont('helvetica','normal'); doc.setFontSize(7.5); return doc.getTextWidth(t); };
     const txt = (t, tx, ty, b) => { doc.setFont('helvetica', b?'bold':'normal'); doc.setFontSize(7.5); doc.setTextColor(...navy); doc.text(t, tx, ty); };
     ly = drawLegend(lp, txt, meas, ly); }
   doc.setFont('helvetica','bold'); doc.setTextColor(...maroon); doc.text('Schematic — NOT TO SCALE. Lengths are field measurements in feet.', M, ly+1);
+  if (sc.lay) drawScopeOn(pdfScopeR(doc), sc.lay, M, ly + 9, PW-2*M);
+  else if (sc.overflow) pdfScopeR(doc).text('SCOPE OF WORK — see page 2', M, ly + 14, 8.5, true);
+  return sc.overflow ? sc.blocks : null;   // blocks for a page 2 when the scope can't fit under the drawing
 }
+const SC_PAGE_H = FRAME.footerRule - 6 - FRAME.bodyTop + SC_TITLE_H;   // a whole page of scope (the page title says SCOPE OF WORK)
+function scopePaged(blocks, measure){   // -> one layout per page, all at one type size: the largest that doesn't add a page; never drops a line
+  const W = PW-2*M;
+  const paginate = sizes => { const pages = [], queue = blocks.map(b => ({...b, lines: [...b.lines]})); let cur = [], guard = 0;
+    const fits = bl => !!scopeLayout(bl, measure, W, SC_PAGE_H, sizes);
+    while (queue.length && guard++ < 2000) { const b = queue.shift();
+      if (fits([...cur, b])) { cur.push(b); continue; }
+      if (cur.length) { pages.push(cur); cur = []; queue.unshift(b); continue; }
+      if (b.lines.length <= 1) { cur.push(b); continue; }
+      const half = Math.ceil(b.lines.length/2), head = b.heading || (b.kind==='covers' ? 'Gutter covers' : 'Base');
+      queue.unshift({...b, lines: b.lines.slice(0, half)}, {...b, heading: head.replace(/ \(cont\.\)$/, '') + ' (cont.)', lines: b.lines.slice(half)}); }
+    if (cur.length) pages.push(cur);
+    return pages; };
+  const fewest = paginate(SC_PAGE_SIZES).length;
+  for (const sz of SC_PAGE_SIZES) { const pages = paginate([sz]); if (pages.length <= fewest) return pages.map(bl => scopeLayout(bl, measure, W, SC_PAGE_H, [sz], true)); }
+  return paginate(SC_PAGE_SIZES).map(bl => scopeLayout(bl, measure, W, SC_PAGE_H, SC_PAGE_SIZES, true));
+}
+const drawScopePage = (R, lay) => drawScopeOn(R, lay, M, FRAME.bodyTop - SC_TITLE_H, PW-2*M, true);
 function pdfMaterialsPages(doc){
   const {navy,gold,grey} = RGB; const rs = resolveEnds(); const groups = activeGroups().filter(g=>g>0);
-  let y = FRAME.bodyTop + 6; const pages = [];
-  const newPage = () => { if (pages.length) doc.addPage(); pages.push('MATERIAL LIST' + (pages.length?' (cont.)':'')); y = FRAME.bodyTop + 6; };
-  newPage();
+  let y = FRAME.bodyTop + 6; const pages = []; let matPages = 0, top1 = 0, matFirst = 1;
+  const newPage = () => { if (pages.length) doc.addPage(); pages.push('MATERIAL LIST' + (matPages?' (cont.)':'')); matPages++; y = FRAME.bodyTop + 6; };
+  { const sb = scopePrintBlocks(); if (sb.length) { const lay = scopeLayout(sb, pdfMeasure(doc), PW-2*M, (FRAME.footerRule - FRAME.bodyTop)*0.5);   // scope of work for the crew, at the top of page 1
+      if (lay) { drawScopeOn(pdfScopeR(doc), lay, M, FRAME.bodyTop - 6, PW-2*M); top1 = lay.h + 12; }
+      else { scopePaged(sb, pdfMeasure(doc)).forEach((l, i) => { if (i) doc.addPage(); pages.push('SCOPE OF WORK' + (i ? ' (cont.)' : '')); drawScopePage(pdfScopeR(doc), l); }); matFirst = pages.length + 1; } } }
+  newPage(); y += top1;
   const hasOpts = groups.length>0; const sections = hasOpts ? [['all','COMBINED — all groups'], ...activeGroups().map(g=>[String(g), GROUPS[g].n.toUpperCase()])] : [['all','MATERIALS']];
   const line = (label, val, sub) => { if (y > FRAME.footerRule-20) newPage(); doc.setFont('helvetica','normal'); doc.setFontSize(sub?9:10); doc.setTextColor(sub?90:0, sub?90:23, sub?90:56); doc.text((sub?'      ':'')+label, M+6, y); doc.setFont('helvetica','bold'); doc.text(String(val), M+262, y, {align:'right'}); doc.setDrawColor(225); doc.line(M, y+4, M+268, y+4); y += sub?12:13.5; };
   const colR = M + 290;
@@ -1987,15 +2296,25 @@ function pdfMaterialsPages(doc){
     const rov = job.manual.rcKitOv[key]; line('Rain chain install kits' + (rov!==undefined?` (override; auto ${m.rcKits})`:''), rov!==undefined?rov:m.rcKits); line('Drip edge extension', m.de ? 'Yes' : 'No');
     y += 10;
   }
-  // manual fields column on the first materials page
-  doc.setPage(1); let my = FRAME.bodyTop + 6; const mn = job.manual;
-  doc.setFillColor(...gold); doc.rect(colR, my-10, PW-M-colR, 16, 'F'); doc.setTextColor(...navy); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.text('JOB DETAILS', colR+6, my+1); my += 18;
-  const mline = (l,v) => { doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(...navy); doc.text(l, colR+6, my); doc.setFont('helvetica','bold'); const vs = String(v||'—'); const lw = doc.getTextWidth(l), room = (PW-M-4) - (colR+6+lw) - 8; let fs = 10; while (fs > 6.5 && doc.getTextWidth(vs) > room) { fs -= 0.5; doc.setFontSize(fs); } doc.text(vs, PW-M-4, my, {align:'right'}); doc.setDrawColor(225); doc.line(colR, my+4, PW-M, my+4); my += 15; };
-  mline('Gutter color', colorName(mn.gutterColor, mn.gutterCustom)); mline('Downspout color', colorName(mn.dsColor, mn.dsCustom)); mline('Gutter cover type', mn.coverType); mline('Wedges', (mn.wedges ? (WEDGES.find(w=>w[0]===mn.wedges)||WEDGES[0])[1] : '— not selected —')); mline('Flex pipes', mn.flexPipes); mline('Screws', mn.screws);
-  my += 8; doc.setFillColor(...gold); doc.rect(colR, my-10, PW-M-colR, 16, 'F'); doc.setTextColor(...navy); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.text('SPECIAL ORDER', colR+6, my+1); my += 18;
+  // manual fields column, starting on the first materials page; it continues on the next page when it runs out of room
+  let rcPage = matFirst; doc.setPage(rcPage); let my = FRAME.bodyTop + 6 + (matFirst===1 ? top1 : 0); const mn = job.manual;
+  let rcSec = '';   // the notes / callouts section being printed: repeated as "(cont.)" at the top of the next page
+  const rcRoom = need => { if (my + need <= FRAME.footerRule - 14) return; rcPage++; if (rcPage > doc.getNumberOfPages()) { doc.addPage(); pages.push('MATERIAL LIST (cont.)'); } doc.setPage(rcPage); my = FRAME.bodyTop + 6;
+    if (rcSec) { doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...navy); doc.text(rcSec + ' (cont.)', colR+6, my); my += 13; } };
+  const rcHead = t => { rcRoom(36); doc.setFillColor(...gold); doc.rect(colR, my-10, PW-M-colR, 16, 'F'); doc.setTextColor(...navy); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.text(t, colR+6, my+1); my += 18; };
+  const rcText = (t, bold, size) => { rcRoom(12); doc.setFont('helvetica', bold?'bold':'normal'); doc.setFontSize(size); doc.setTextColor(...navy); doc.text(t, colR+6, my); };
+  rcHead('JOB DETAILS');
+  const mline = (l,v) => { rcRoom(15); doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(...navy); doc.text(l, colR+6, my); doc.setFont('helvetica','bold'); const vs = String(v||'—'); const lw = doc.getTextWidth(l), room = (PW-M-4) - (colR+6+lw) - 8; let fs = 10; while (fs > 6.5 && doc.getTextWidth(vs) > room) { fs -= 0.5; doc.setFontSize(fs); } doc.text(vs, PW-M-4, my, {align:'right'}); doc.setDrawColor(225); doc.line(colR, my+4, PW-M, my+4); my += 15; };
+  mline('Gutter color', colorName(mn.gutterColor, mn.gutterCustom)); mline('Downspout color', colorName(mn.dsColor, mn.dsCustom)); mline('Gutter cover type', mn.coverType); mline('Wedges', (mn.wedges ? (WEDGES.find(w=>w[0]===mn.wedges)||WEDGES[0])[1] : '— not selected —')); if (mn.hrHangers || job.items.some(i => i.type==='run' && !i.existing && i.profile==='6" Half Round')) mline('Half round hangers', mn.hrHangers==='external' ? 'External (stamped)' : mn.hrHangers==='internal' ? 'Internal (hidden)' : '— not selected —'); mline('Flex pipes', mn.flexPipes); mline('Screws', mn.screws);
+  my += 8; rcHead('SPECIAL ORDER');
   MANUAL_TEXT.forEach(([k,l]) => mline(l, mn[k]));
-  my += 8; doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.text('ADDITIONAL NOTES', colR+6, my); my += 13; doc.setFont('helvetica','normal'); doc.setFontSize(9.5); const noteLines = doc.splitTextToSize(mn.notes||'—', PW-M-colR-10); doc.text(noteLines, colR+6, my);
-  const notes = job.items.filter(i=>i.type==='text'); if (notes.length) { my += 12*Math.min(14, noteLines.length) + 10; doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.text('CALLOUTS ON DRAWING', colR+6, my); my += 13; doc.setFont('helvetica','normal'); doc.setFontSize(9.5); notes.forEach(n => { if (my < FRAME.footerRule-20) { doc.text('• ' + n.text, colR+6, my); my += 12; } }); }
+  const rcParas = paras => { for (const pa of paras) { doc.setFont('helvetica','normal'); doc.setFontSize(9.5); const ls = doc.splitTextToSize(pa, PW-M-colR-10);   // a wrapped note stays on one page
+      if (ls.length > 1 && ls.length*12 < 400) rcRoom(ls.length*12); for (const ln of ls) { rcText(ln, false, 9.5); my += 12; } } };
+  my += 8; rcRoom(26); rcText('ADDITIONAL NOTES', true, 9); my += 13; rcSec = 'ADDITIONAL NOTES';
+  rcParas(String(mn.notes||'—').split('\n'));
+  const notes = job.items.filter(i=>i.type==='text'); if (notes.length) { my += 10; rcSec = ''; rcRoom(26); rcText('CALLOUTS ON DRAWING', true, 9); my += 13; rcSec = 'CALLOUTS ON DRAWING';
+    rcParas(notes.map(n => '• ' + String(n.text||'').replace(/\s*\n+\s*/g, ' / '))); }
+  rcSec = '';
   doc.setPage(doc.getNumberOfPages());
   // photos
   job.photos.forEach((ph) => { const rec = imgCache.get(ph.id); doc.addPage(); pages.push(`PHOTO ${ph.n}`);
@@ -2025,35 +2344,40 @@ function canvasFrame(x, title){
 }
 function exportDrawingPNG(){
   pendingExport = exportDrawingPNG; if (blockIfInvalid()) return;
-  const S = 3; const c = document.createElement('canvas'); c.width = PW*S; c.height = PH*S; const x = c.getContext('2d'); x.scale(S,S);
-  canvasFrame(x, 'JOB DRAWING');
   const hex = a => `rgb(${a[0]},${a[1]},${a[2]})`; const groups = activeGroups().filter(g=>g>0);
   const legendH = 12 + (groups.length?14:0) + legendRowCount()*LG_ROW + 12;
-  const area = {x:M, y:FRAME.bodyTop, w:PW-2*M, h:FRAME.footerRule - 10 - legendH - FRAME.bodyTop};
+  const mctx = document.createElement('canvas').getContext('2d'), sc = scopeForDrawing(cvMeasure(mctx), legendH), lays = sc.overflow ? scopePaged(sc.blocks, cvMeasure(mctx)) : [], np = 1 + lays.length;
+  const S = np > 2 ? 2 : 3; const c = document.createElement('canvas'); c.width = PW*S; c.height = PH*S*np; const x = c.getContext('2d'); x.scale(S,S);   // a scope too long for the page goes on a second page below
+  canvasFrame(x, 'JOB DRAWING');
+  const area = {x:M, y:FRAME.bodyTop, w:PW-2*M, h:FRAME.footerRule - 10 - legendH - sc.h - FRAME.bodyTop};
   x.strokeStyle=hex(RGB.navy); x.lineWidth=1; x.strokeRect(area.x,area.y,area.w,area.h);
   const bb = sceneBBox(); const k = Math.min(area.w/bb.w, area.h/bb.h); const ox = area.x + (area.w - bb.w*k)/2, oy = area.y + (area.h - bb.h*k)/2;
   x.save(); x.beginPath(); x.rect(area.x,area.y,area.w,area.h); x.clip(); x.translate(ox,oy); x.scale(k,k); x.translate(-bb.x,-bb.y);
   const p = canvasPainter(x); const fp = bgFootprint(); if (fp) p.image(imgCache.get(job.bg.imgId).img, job.bg.x||0, job.bg.y||0, job.bg.w, job.bg.h, job.bg.rot||0);
   const rs = resolveEnds(); const o = {field:false, isSel: () => false, invalid:new Set(), ends: rs.ends, dom: dominantProfile(), placed: []}; drawScene(p,o); drawPins(p,o); x.restore();
   let ly = area.y+area.h+14, lx = M; x.textBaseline='alphabetic'; x.textAlign='left';
-  if (groups.length) { x.fillStyle=hex(RGB.navy); x.font='700 8.5px Helvetica,Arial'; x.fillText('OPTIONS:', lx, ly); lx += 48; for (const g of groups) { x.fillStyle=GROUPS[g].c; x.fillRect(lx, ly-7, 10, 10); x.strokeStyle=hex(RGB.navy); x.strokeRect(lx, ly-7, 10, 10); x.fillStyle=hex(RGB.navy); x.font='400 8.5px Helvetica,Arial'; const t=`${g} = ${GROUPS[g].n}`; x.fillText(t, lx+14, ly); lx += 14 + x.measureText(t).width + 14; } ly += 14; }
+  if (groups.length) { x.fillStyle=hex(RGB.navy); x.font='700 8.5px Helvetica,Arial'; x.fillText('OPTIONS:', lx, ly); lx += 48; for (const g of groups) { x.fillStyle=GROUPS[g].c; x.fillRect(lx, ly-7, 10, 10); x.strokeStyle=hex(RGB.navy); x.strokeRect(lx, ly-7, 10, 10); x.fillStyle=hex(RGB.navy); x.font='400 8.5px Helvetica,Arial'; const t=optLegendText(g); x.fillText(t, lx+14, ly); lx += 14 + x.measureText(t).width + 14; } ly += 14; }
   { const lp = canvasPainter(x); const meas = t => { x.font='400 7.5px Helvetica,Arial'; return x.measureText(t).width; };
     const txt = (t, tx, ty, b) => { x.font=`${b?700:400} 7.5px Helvetica,Arial`; x.fillStyle=hex(RGB.navy); x.textAlign='left'; x.textBaseline='alphabetic'; x.fillText(t, tx, ty); };
     ly = drawLegend(lp, txt, meas, ly); }
   x.fillStyle=hex(RGB.maroon); x.font='700 7.5px Helvetica,Arial'; x.fillText('Schematic — NOT TO SCALE. Lengths are field measurements in feet.', M, ly+1);
+  if (sc.lay) drawScopeOn(cvScopeR(x), sc.lay, M, ly + 9, PW-2*M);
+  else if (sc.overflow) { cvScopeR(x).text('SCOPE OF WORK — see page 2', M, ly + 14, 8.5, true);
+    lays.forEach((l, i) => { x.save(); x.translate(0, PH*(i + 1)); canvasFrame(x, 'SCOPE OF WORK'); drawScopePage(cvScopeR(x), l); x.restore(); }); }
   deliver(dataURLtoBlob(c.toDataURL('image/png')), filenameBase()+'_drawing.png');
 }
 function exportDrawingPDF(){
   pendingExport = exportDrawingPDF; if (blockIfInvalid()) return;
   if (!window.jspdf) { const sc = document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'; document.head.appendChild(sc); return toast('PDF library still loading — needs internet once. Try again in a moment.'); }
-  const doc = new window.jspdf.jsPDF({unit:'pt', format:'letter', compress:true});
-  pdfDrawingPage(doc); pdfFrame(doc, 'JOB DRAWING', 1, 1);
+  const doc = newPdf();
+  const p2 = pdfDrawingPage(doc), lays = p2 ? scopePaged(p2, pdfMeasure(doc)) : [], total = 1 + lays.length; pdfFrame(doc, 'JOB DRAWING', 1, total);
+  lays.forEach((l, i) => { doc.addPage(); drawScopePage(pdfScopeR(doc), l); pdfFrame(doc, 'SCOPE OF WORK', i + 2, total); });
   deliver(doc.output('blob'), filenameBase()+'_drawing.pdf');
 }
 function exportMaterialsPDF(){
   pendingExport = exportMaterialsPDF; if (blockIfInvalid()) return;
   if (!window.jspdf) { const sc = document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'; document.head.appendChild(sc); return toast('PDF library still loading — needs internet once. Try again in a moment.'); }
-  const doc = new window.jspdf.jsPDF({unit:'pt', format:'letter', compress:true});
+  const doc = newPdf();
   const titles = pdfMaterialsPages(doc); const total = doc.getNumberOfPages();
   for (let i=1;i<=total;i++){ doc.setPage(i); pdfFrame(doc, titles[i-1] || 'MATERIAL LIST', i, total); }
   deliver(doc.output('blob'), filenameBase()+'_materials.pdf');
