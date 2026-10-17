@@ -211,6 +211,7 @@ body.full #contBar{bottom:68px;z-index:9}
 .jobrow .jt span{font-size:13px;color:#444}
 .vlist{margin:0;padding-left:20px;font-size:16px;line-height:1.5}
 #photoView img{max-width:92vw;max-height:70vh;border-radius:10px;background:#000}
+#tabBanner{position:fixed;left:50%;transform:translateX(-50%);top:8px;background:var(--gold,#FFCE34);color:var(--navy,#001738);padding:10px 14px;border-radius:12px;font-size:14px;z-index:98;max-width:92vw;display:flex;gap:10px;align-items:center;box-shadow:0 2px 10px rgba(0,0,0,.25)}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:40%;background:var(--navy);color:#fff;padding:14px 22px;border-radius:14px;font-weight:800;font-size:18px;z-index:99;pointer-events:none;opacity:0;transition:opacity .2s}
 #toast.show{opacity:1}
 .wfixes{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:6px 0 10px}.wfix{display:flex;flex-direction:column;font-weight:700;font-size:13px;gap:4px}.wfix select,.wfix input{min-height:44px;font-size:16px}.wfix.hidden{display:none}
@@ -367,7 +368,7 @@ body.full #contBar{bottom:68px;z-index:9}
 <a id="dl" class="hidden"></a>
 
 <!-- PDF library loads in the background so a slow connection never blocks the app; pdf.js is fetched only when a PDF is imported -->
-<script async src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script async src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha512-qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKNRRhy5X5AAOnx5S09ydFYWWNSfcEqDTTHgtNA==" crossorigin="anonymous"></script>
 <script>
 (() => {
 'use strict';
@@ -411,7 +412,7 @@ const OV_FIELDS = {
   miterIn:{get:m=>m.miterIn, set:(m,v)=>m.miterIn=v}, miterOut:{get:m=>m.miterOut, set:(m,v)=>m.miterOut=v}, miterBayOut:{get:m=>m.miterBayOut, set:(m,v)=>m.miterBayOut=v}, miterBayIn:{get:m=>m.miterBayIn, set:(m,v)=>m.miterBayIn=v},
   coverLF:{get:m=>m.coverLF, set:(m,v)=>m.coverLF=v}, dsPieces:{get:m=>m.dsPieces, set:(m,v)=>m.dsPieces=v},
   elbA:{get:m=>m.elbA, set:(m,v)=>m.elbA=v}, elbB:{get:m=>m.elbB, set:(m,v)=>m.elbB=v}, elbRound:{get:m=>m.elbRound, set:(m,v)=>m.elbRound=v},
-  dropOutlets:{get:m=>m.dropOutlets, set:(m,v)=>m.dropOutlets=v}, miniDs:{get:m=>m.miniDs, set:(m,v)=>m.miniDs=v}, rakeLF:{get:m=>m.rakeLF, set:(m,v)=>m.rakeLF=v}, cb:{get:m=>m.cb, set:(m,v)=>m.cb=v}, dsExt:{get:m=>m.dsExt, set:(m,v)=>m.dsExt=v}, outlets:{get:m=>m.outlets, set:(m,v)=>m.outlets=v},
+  dropOutlets:{get:m=>m.dropOutlets, set:(m,v)=>m.dropOutlets=v}, miniDs:{get:m=>m.miniDs, set:(m,v)=>m.miniDs=v}, rakeLF:{get:m=>m.rakeLF, set:(m,v)=>m.rakeLF=v}, cb:{get:m=>m.cb, set:(m,v)=>m.cb=v}, dsExt:{get:m=>m.dsExt, set:(m,v)=>m.dsExt=v}, outlets:{get:m=>m.outlets, set:(m,v)=>m.outlets=v}, outlets4x5:{get:m=>m.outlets4x5, set:(m,v)=>m.outlets4x5=v},
   splashguard:{get:m=>m.acc.splashguard, set:(m,v)=>m.acc.splashguard=v}, splashblocks:{get:m=>m.splashblocks, set:(m,v)=>m.splashblocks=v}, birdCages:{get:m=>m.birdCages, set:(m,v)=>m.birdCages=v}, rainchains:{get:m=>m.rainchains, set:(m,v)=>m.rainchains=v},
 };
 ['2"','4"','6"'].forEach(sz => { OV_FIELDS['off'+sz] = {get:m=>m.offsets[sz], set:(m,v)=>m.offsets[sz]=v}; OV_FIELDS['roff'+sz] = {get:m=>m.offRound[sz], set:(m,v)=>m.offRound[sz]=v}; });
@@ -667,19 +668,26 @@ function addedToast(what, gone){ toast(gone ? `${what} · removed oldest job: ${
 let dirtyTimer = null;
 function touch(){ // mark dirty, autosave soon
   if (!job) return; job.updated = Date.now();
-  clearTimeout(dirtyTimer); dirtyTimer = setTimeout(() => { bumpRecent(); saveStore(); }, 1500);
+  clearTimeout(dirtyTimer); dirtyTimer = setTimeout(() => { pruneCorners(); bumpRecent(); saveStore(); }, 1500);
 }
 function bumpRecent(){ const i = store.order.indexOf(job.id); if (i > 0) { store.order.splice(i,1); store.order.unshift(job.id); } }
-function flushSave(){ clearTimeout(dirtyTimer); if (job) { bumpRecent(); saveStore(); } }
+function flushSave(){ clearTimeout(dirtyTimer); if (job) { pruneCorners(); bumpRecent(); saveStore(); } }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushSave(); });
 window.addEventListener('pagehide', flushSave);
 window.addEventListener('beforeunload', flushSave);
 
 /* ---------------- undo / redo ---------------- */
 const undoStack = [], redoStack = [];
-function snapshot(){ undoStack.push(JSON.stringify(job.items)); if (undoStack.length > 60) undoStack.shift(); redoStack.length = 0; }
-function undo(){ if (!undoStack.length) return toast('Nothing to undo'); redoStack.push(JSON.stringify(job.items)); job.items = JSON.parse(undoStack.pop()); afterItemsChanged(); }
-function redo(){ if (!redoStack.length) return toast('Nothing to redo'); undoStack.push(JSON.stringify(job.items)); job.items = JSON.parse(redoStack.pop()); afterItemsChanged(); }
+/* B8 (v3.10): a snapshot holds the items AND the corner overrides, so Undo takes back a corner flip too */
+const undoState = () => JSON.stringify({items: job.items, corners: job.corners});
+function restoreState(str){ const st = JSON.parse(str); if (Array.isArray(st)) { job.items = st; } else { job.items = st.items; job.corners = st.corners || {}; } }
+function snapshot(){ undoStack.push(undoState()); if (undoStack.length > 60) undoStack.shift(); redoStack.length = 0; }
+function undo(){ if (!undoStack.length) return toast('Nothing to undo'); redoStack.push(undoState()); restoreState(undoStack.pop()); afterItemsChanged(); }
+function redo(){ if (!redoStack.length) return toast('Nothing to redo'); undoStack.push(undoState()); restoreState(redoStack.pop()); afterItemsChanged(); }
+function pruneCorners(){ /* B8: drop corner overrides whose corner no longer exists, so a stale key can't attach to a corner drawn there later */
+  if (!job || !job.corners || !Object.keys(job.corners).length) return; const live = new Set(resolveEnds().corners.map(c => c.key));
+  for (const k of Object.keys(job.corners)) if (!live.has(k)) delete job.corners[k];
+}
 function afterItemsChanged(){
   if (sel && !job.items.find(i => i.id === sel)) { sel = null; hideProps(); }
   for (const id of [...multi]) if (!job.items.find(i => i.id === id)) multi.delete(id);
@@ -810,6 +818,13 @@ function resolveEnds(onlyGroups){   // onlyGroups: optional Set of group numbers
     corners.push({key, x:n.x, y:n.y, kind, autoKind, auto, tiein, groups:[...new Set(newEnds.map(q => q.r.g||0))]});
     for (const q of newEnds) { const rec = res.get(q.r.id); const manual = q.e===1 ? q.r.lend : q.r.rend; if (geo(manual)) { if (q.e===1) rec.l = kind; else rec.r = kind; } }
   }
+  // 4. T-joints (v3.10, Ben 17 Oct): a new run that starts or ends in the middle of an existing (dashed) run. Tie-in = the tie-in fee and a splice, never a miter; End cap set by hand = just an end cap.
+  const tees = new Map();
+  for (const r of runs) { if (r.existing) continue; for (const e of [1,2]) { const x = e===1?r.x1:r.x2, y = e===1?r.y1:r.y2, m = e===1?r.lend:r.rend; if (!geo(m)) continue;
+      const n = nodeOf.get(r.id+':'+e); if (n && n.ends.length >= 2 && n.ends.some(q => q.r.existing)) continue;   /* already a corner / splice with old gutter at its end: counted above */
+      if (!runs.some(o => o.existing && o.id!==r.id && midOfRun(o, x, y))) continue;
+      const key = CK(x,y) + ':t'; let c = tees.get(key); if (!c) { c = {key, x, y, kind:'seam', autoKind:'seam', auto:true, tiein:true, tee:true, groups:[]}; tees.set(key, c); corners.push(c); }
+      if (!c.groups.includes(r.g||0)) c.groups.push(r.g||0); if (!n || n.ends.length < 2) { const rec = res.get(r.id); if (e===1) rec.l = 'seam'; else rec.r = 'seam'; } } }   /* a loose end on old gutter is a splice, not an end cap; a corner of two new runs sitting on old gutter keeps its miter and adds the tie-in */
   return {ends: res, corners, side: sideOfRun};
 }
 // Which end of a run is the LEFT end cap: stand on the street side facing the gutter; left is on your left.
@@ -828,15 +843,26 @@ function textW(str, size){ return str.length*size*0.58 + size*0.7; }
 function placeLabel(o, x, y, w, h, keep, prefer){
   const cands = [[0,1],[0,-1],[1,0],[-1,0],[1,1],[-1,1],[1,-1],[-1,-1]];
   let best=null, bs=Infinity;
-  cands.forEach(([dx,dy],i) => {
-    const cx = x + dx*(keep + w/2*Math.abs(dx)) , cy = y + dy*(keep + h/2*Math.abs(dy));
-    const r = {x:cx-w/2, y:cy-h/2, w, h}; let s = i*2 + (prefer===i ? -3 : 0);
+  const tryRing = (kp, ringPenalty) => cands.forEach(([dx,dy],i) => {
+    const cx = x + dx*(kp + w/2*Math.abs(dx)) , cy = y + dy*(kp + h/2*Math.abs(dy));
+    const r = {x:cx-w/2, y:cy-h/2, w, h}; let s = i*2 + (prefer===i ? -3 : 0) + ringPenalty;
     for (const it of job.items) { if (it.type==='run') { const d = rectSegDist(r, it.x1,it.y1,it.x2,it.y2); if (d===0) s += 120; else if (d < 8) s += 30; }
       else if ((it.type==='ds' || it.type==='acc' || it.type==='haz') && !(it.x===x && it.y===y)) { const d = rectSegDist(r, it.x,it.y,it.x,it.y); if (d < 10) s += 60; } }
     for (const pr of (o.placed||[])) { const ov = rectOverlap(r, pr); if (ov) s += 40 + ov/20; }
+    if (o.bounds) { const b = o.bounds; if (r.x < b.x || r.y < b.y || r.x + r.w > b.x + b.w || r.y + r.h > b.y + b.h) s += 500; }   /* B5 (v3.10): never outside the export frame */
     if (s < bs) { bs = s; best = {cx, cy, r}; }
   });
+  tryRing(keep, 0);
+  if (bs >= 40) tryRing(keep*2 + Math.min(w, h)*0.5 + 6, 20);   /* B5: crowded — try a second ring farther out (a leader line is drawn for far labels) */
   (o.placed ||= []).push(best.r); return best;
+}
+function dsLabelExtent(d, clean){   /* B5: the size drawDS will give this downspout's label (full or customer-PNG form), so the export frame can leave room for it */
+  const reuse = d.status==='reuse', tt = d.term ? ' · ' + termLabel(d.term).toUpperCase() : '', bc = d.birdCage ? ' · BIRD CAGE' : '';
+  const core = reuse ? `REUSE ${d.story?dsStoryTag(d.story):''}`.trim() : (d.cb ? `CB ${seqText(d.seq)||''} ${d.story?dsStoryTag(d.story):''}` : `${seqText(d.seq)||'?'} ${d.story?dsStoryTag(d.story):'?'}`).replace(/\s+/g,' ').trim();
+  const l1 = clean ? [reuse ? 'EXISTING' : '', d.cb ? 'COLLECTOR BOX' : '', d.birdCage ? 'BIRD CAGE' : '', d.term ? termLabel(d.term).toUpperCase() : ''].filter(Boolean).join(' · ') : core + bc + tt;
+  const s1 = reuse?10:11, l2 = (!clean && !reuse && d.size && d.size!=='3×4"') ? d.size : null, s2 = 9;
+  if (!l1) return {w:0, h:0};
+  return {w: Math.max(textW(l1, s1), l2 ? textW(l2, s2) : 0), h: s1*1.35 + (l2 ? s2*1.35 + 1 : 0)};
 }
 function drawEndMark(p, x, y, ux, uy, kind, col, w){
   // ux,uy = unit vector pointing INTO the run from this end; perpendicular = (-uy, ux)
@@ -1047,8 +1073,9 @@ function snapPt(x, y, excludeId){
   let best = null, bd = 12 / Math.min(job.view.s, 1.5) ;
   for (const it of job.items) if (it.type==='run' && it.id!==excludeId) for (const [px,py] of [[it.x1,it.y1],[it.x2,it.y2]]) { const d = dist(x,y,px,py); if (d < bd) { bd = d; best = {x:px,y:py}; } }
   if (best) return best;
-  if (job.bg.type==='grid') return {x: Math.round(x/GRID)*GRID, y: Math.round(y/GRID)*GRID};
-  return {x, y};
+  const g = job.bg.type==='grid' ? {x: Math.round(x/GRID)*GRID, y: Math.round(y/GRID)*GRID} : {x, y};
+  for (const it of job.items) if (it.type==='run' && it.existing && it.id!==excludeId) { const dx=it.x2-it.x1, dy=it.y2-it.y1, L2=dx*dx+dy*dy||1; let t=((g.x-it.x1)*dx+(g.y-it.y1)*dy)/L2; t=clamp(t,0,1); const px=it.x1+dx*t, py=it.y1+dy*t; if (dist(g.x,g.y,px,py) < 6 && dist(px,py,it.x1,it.y1) >= 3 && dist(px,py,it.x2,it.y2) >= 3) return {x:px, y:py}; }   /* v3.10: land exactly on old gutter for a mid-run tie-in */
+  return g;
 }
 function segDist(px,py, x1,y1,x2,y2){ const dx=x2-x1, dy=y2-y1, L2=dx*dx+dy*dy||1; let t=((px-x1)*dx+(py-y1)*dy)/L2; t=clamp(t,0,1); return dist(px,py,x1+dx*t,y1+dy*t); }
 function hitTest(x, y){
@@ -1129,7 +1156,8 @@ cv.addEventListener('pointermove', e => {
   if (gesture.kind==='pin') { if (!p.moved) return; gesture.pin.x = gesture.ox + (w.x-gesture.start.x); gesture.pin.y = gesture.oy + (w.y-gesture.start.y); render(); return; }
 });
 function moveItem(it, o, dx, dy){
-  if (it.type==='run') { let a = {x:o.x1+dx, y:o.y1+dy}; if (job.bg.type==='grid') a = {x:Math.round(a.x/GRID)*GRID, y:Math.round(a.y/GRID)*GRID}; const ddx = a.x-o.x1, ddy = a.y-o.y1; it.x1=o.x1+ddx; it.y1=o.y1+ddy; it.x2=o.x2+ddx; it.y2=o.y2+ddy; }
+  if (it.type==='run') { let a = {x:o.x1+dx, y:o.y1+dy}; if (job.bg.type==='grid') a = {x:Math.round(a.x/GRID)*GRID, y:Math.round(a.y/GRID)*GRID}; const ddx = a.x-o.x1, ddy = a.y-o.y1; it.x1=o.x1+ddx; it.y1=o.y1+ddy; it.x2=o.x2+ddx; it.y2=o.y2+ddy;
+    if (ddx || ddy) for (const [ox,oy] of [[o.x1,o.y1],[o.x2,o.y2]]) { const k = CK(ox,oy), nk = CK(ox+ddx, oy+ddy); if (job.corners[k]!==undefined && job.corners[nk]===undefined) { job.corners[nk] = job.corners[k]; delete job.corners[k]; } } }   /* B8: a corner setting travels with the run; stale ones are pruned on save */
   else if (it.type==='ink') it.pts = o.pts.map(q => [q[0]+dx, q[1]+dy]);
   else if (it.type==='text') { it.x=o.x+dx; it.y=o.y+dy; }
   else { it.x=o.x+dx; it.y=o.y+dy; }
@@ -1146,7 +1174,7 @@ function endPointer(e){
   if (g.kind==='ptr') { if (g.isNew && !p.moved) { g.it.ptrs.pop(); if (!g.it.ptrs.length) delete g.it.ptrs; toast('Drag from the + to the spot you want to point at'); render(); return; } if (!g.isNew && !p.moved && tap) { const now = performance.now(); if (lastPtrTap.id===g.it.id && lastPtrTap.i===g.i && now-lastPtrTap.t < 450) { snapshot(); g.it.ptrs.splice(g.i,1); if (!g.it.ptrs.length) delete g.it.ptrs; lastPtrTap = {}; afterItemsChanged(); showProps(); toast('Pointer removed'); return; } lastPtrTap = {id:g.it.id, i:g.i, t:now}; toast('Double-tap a pointer end to remove it'); return; } afterItemsChanged(); showProps(); return; }
   if (g.kind==='move' || g.kind==='endpoint' || g.kind==='anchor' || g.kind==='dslabel') { if (p.moved) { afterItemsChanged(); showProps();
       if (g.kind==='endpoint') { const r = g.it, e = g.end; if (!r.existing) { const x = e===1?r.x1:r.x2, y = e===1?r.y1:r.y2, m = e===1?r.lend:r.rend;
-          const on = existingEndAt(x, y, r.id);
+          const on = existingAt(x, y, r.id);
           if ((on && (m==='tiein' || m==='endcap')) || (!on && m==='tiein')) { if (e===1) r.lend = 'auto'; else r.rend = 'auto'; afterItemsChanged(); showProps(); }   // landed on old gutter: ask afresh; dragged off it: the old answer no longer applies
           if (on) askJoints(jointsOf(r).filter(j => j.e===e)); } else askJoints(jointsOf(r)); } }   // an end dragged onto old gutter (or old gutter dragged onto a new end): ask (v3.8.2)
     else if (g.kind==='move') { if (tap) selectItem(g.it); } return; }
@@ -1184,6 +1212,7 @@ function cycleCorner(c){
   const fam = k => ({miter_in:'miter_bay_in', miter_out:'miter_bay_out', miter_bay_in:'miter_in', miter_bay_out:'miter_out'})[k];
   const base = (c.autoKind && c.autoKind!=='seam') ? c.autoKind : (c.kind==='seam' ? 'miter_out' : c.kind); const ring = [null, flip(base), fam(base), flip(fam(base))];
   const cur = job.corners[c.key] || null; const i = ring.indexOf(cur); const next = ring[(i<0 ? 0 : i+1) % ring.length];
+  snapshot();   /* B8: a corner flip can be undone */
   if (next) job.corners[c.key] = next; else delete job.corners[c.key];
   toast('Corner: ' + (next ? endLabel(next) : 'auto (' + endLabel(resolveEnds().corners.find(x=>x.key===c.key)?.kind || 'endcap') + ')'));
   renderMaterials(); touch(); render();
@@ -1226,16 +1255,19 @@ function commitRun(start, end, len, existing){
 /* ---- joint question: a new run end that lands on existing (dashed) gutter is either a tie-in (strip miter / splice, charged) or an end cap (nothing) ----
    The rep answers once per joint; the answer is kept on that run end (lend / rend = 'tiein' | 'endcap') and shows in the run panel. */
 const existingEndAt = (x, y, skipId) => job.items.some(i => i.type==='run' && i.existing && i.id!==skipId && (dist(i.x1,i.y1,x,y) < 3 || dist(i.x2,i.y2,x,y) < 3));
+const existingMidAt = (x, y, skipId) => job.items.some(i => i.type==='run' && i.existing && i.id!==skipId && midOfRun(i, x, y));   /* v3.10: the point sits on the old gutter between its ends (a T-joint) */
+const midOfRun = (i, x, y) => segDist(x, y, i.x1, i.y1, i.x2, i.y2) < 3 && dist(i.x1,i.y1,x,y) >= 3 && dist(i.x2,i.y2,x,y) >= 3;
+const existingAt = (x, y, skipId) => existingEndAt(x, y, skipId) || existingMidAt(x, y, skipId);
 function jointsOf(r){   // [{r, e}] new-run ends that touch old gutter and have not been answered: r's own ends if r is new; other new runs' ends if r is existing
   const out = [];
-  if (!r.existing) { for (const e of [1,2]) { const x = e===1?r.x1:r.x2, y = e===1?r.y1:r.y2, m = e===1?r.lend:r.rend; if ((!m || m==='auto') && existingEndAt(x, y, r.id)) out.push({r, e}); } }
-  else for (const o of job.items) if (o.type==='run' && !o.existing) for (const e of [1,2]) { const x = e===1?o.x1:o.x2, y = e===1?o.y1:o.y2, m = e===1?o.lend:o.rend; if ((!m || m==='auto') && (dist(r.x1,r.y1,x,y) < 3 || dist(r.x2,r.y2,x,y) < 3)) out.push({r:o, e}); }
+  if (!r.existing) { for (const e of [1,2]) { const x = e===1?r.x1:r.x2, y = e===1?r.y1:r.y2, m = e===1?r.lend:r.rend; if ((!m || m==='auto') && existingAt(x, y, r.id)) out.push({r, e}); } }
+  else for (const o of job.items) if (o.type==='run' && !o.existing) for (const e of [1,2]) { const x = e===1?o.x1:o.x2, y = e===1?o.y1:o.y2, m = e===1?o.lend:o.rend; if ((!m || m==='auto') && (dist(r.x1,r.y1,x,y) < 3 || dist(r.x2,r.y2,x,y) < 3 || midOfRun(r, x, y))) out.push({r:o, e}); }   /* mid-run joints too (Ben, 17 Oct; v3.10) */
   return out;
 }
 function askJoints(list, onCancel){
   if (!list.length) return;
   const {r, e} = list[0], rest = list.slice(1);
-  const ov = openSheet(`<h3>Meets existing gutter</h3><div class="row" style="font-size:16px">This end of the new run lands on existing gutter. Is it tied in?</div>
+  const ov = openSheet(`<h3>Meets existing gutter</h3><div class="row" style="font-size:16px">This end of the new run lands on existing gutter (at its end or part-way along it). Is it tied in?</div>
     <div class="seg big" data-seg="joint"><button class="btn" data-j="tiein">TIE IN<br><small style="font-weight:400">joins the old gutter: strip miter or splice</small></button><button class="btn" data-j="endcap">END CAP<br><small style="font-weight:400">new gutter stops here, nothing added</small></button></div>
     <div class="actions"><button class="btn ghost" id="jCancel">Cancel</button></div>`, {dismiss:false});
   ov.querySelectorAll('[data-j]').forEach(b => b.onclick = () => { closeSheet(); if (e===1) r.lend = b.dataset.j; else r.rend = b.dataset.j; touch(); renderMaterials(); render(); if (sel===r.id) showProps();
@@ -1516,7 +1548,12 @@ function validationWarnings(){
   if (n) w.push(`${n} existing run${n>1?'s have':' has'} covers but no length — the covers footage will be short`);
   if (!job.manual.gutterColor) w.push('Gutter color not chosen'); if (!job.manual.wedges) w.push('Wedges not selected (pick None if no wedges)'); if (job.items.some(i=>i.type==='ds' && i.status!=='reuse') && !job.manual.dsColor) w.push('Downspout color not chosen');
   w.push(...scopeWarnings());   // scope of work: area names, cover type, half-round hangers, hand edits gone stale, tear-out note
+  w.push(...baseEmptyWarning());   /* v3.10: the minimum job applies to the Base only */
   return w;
+}
+function baseEmptyWarning(){   /* quick win (v3.10): a job drawn entirely as an Option gets no minimum-job floor and no Base line item */
+  try { if (!pbView) return []; const pa = priceAll(); if (pa.groups.length && !pa.groups.some(p => p.g===0)) return ['Nothing is on the Base — everything is in an Option, so the minimum job doesn\'t apply and there is no Base line item. Is the wrong group selected?']; } catch(e){}
+  return [];
 }
 
 /* ---------------- material list ---------------- */
@@ -1528,7 +1565,7 @@ function computeMaterials(gFilter, rs, noOv){ // gFilter: 'all' or group index; 
   rs = gFilter==='all' ? (rs || resolveEnds()) : resolveEnds(new Set([0, +gFilter]));   // Base = base runs only; an option = base + that option (its corners onto the base count as miters)
   const inG = it => gFilter==='all' || (it.g||0)===+gFilter;
   const items = job.items.filter(i => inG(i) && !(i.type==='run' && i.existing));
-  const m = {gutter:{}, coverLF:0, sgLF:0, newLF:0, hangers:0, endcaps:0, endcapL:0, endcapR:0, miterIn:0, miterOut:0, miterBay:0, miterBayIn:0, miterBayOut:0, ds:0, dsReuse:0, dsBySize:{}, dsByStory:{}, elbA:0, elbB:0, offsets:{'2"':0,'4"':0,'6"':0}, outlets:0, straps:0, acc:{splashguard:0,splashblock:0,dropoutlet:0,minids:0,offset:0,dripedge:0,rainchain:0}, rakeLF:0, miniPieces:0, rainchainTerm:0, sbTerm:0, dsPieces:0, dsPiecesBySize:{}, dsExt:0, cb:0, cbNew:0, birdCages:0, elbRound:0, offRound:{'2"':0,'4"':0,'6"':0}};
+  const m = {gutter:{}, coverLF:0, sgLF:0, newLF:0, hangers:0, endcaps:0, endcapL:0, endcapR:0, miterIn:0, miterOut:0, miterBay:0, miterBayIn:0, miterBayOut:0, ds:0, dsReuse:0, dsBySize:{}, dsByStory:{}, elbA:0, elbB:0, offsets:{'2"':0,'4"':0,'6"':0}, outlets:0, straps:0, acc:{splashguard:0,splashblock:0,dropoutlet:0,minids:0,offset:0,dripedge:0,rainchain:0}, rakeLF:0, miniPieces:0, rainchainTerm:0, sbTerm:0, dsPieces:0, dsPiecesBySize:{}, dsExt:0, cb:0, cbNew:0, outlets4x5:0, birdCages:0, elbRound:0, offRound:{'2"':0,'4"':0,'6"':0}};
   for (const it of items) {
     if (it.type==='ds' && it.birdCage) m.birdCages++;   // bird cages: on new and reused downspouts alike
     if (it.type==='run') { const L = +it.len||0; m.gutter[it.profile||'?'] = (m.gutter[it.profile||'?']||0) + L; m.newLF += L; if (it.cover) m.coverLF += L; if (it.rake) m.rakeLF += L;
@@ -1539,7 +1576,7 @@ function computeMaterials(gFilter, rs, noOv){ // gFilter: 'all' or group index; 
       const pc = dsPieces(st); m.dsPieces += pc; m.dsPiecesBySize[it.size||'?'] = (m.dsPiecesBySize[it.size||'?']||0) + pc;
       if (it.size==='4" Round') { for (const t of (it.seq||[])) { if (t==='A'||t==='B') m.elbRound++; else if (m.offRound[t]!==undefined) m.offRound[t]++; } }   // round: one elbow part; A/B only tells the crew placement
       else if (it.size!=='Smooth Square') { for (const t of (it.seq||[])) { if (t==='A') m.elbA++; else if (t==='B') m.elbB++; else if (m.offsets[t]!==undefined) m.offsets[t]++; } }   // smooth square: elbows/offsets custom-cut from downspout stock, not counted
-      m.straps += STRAPS[st] || 2; if (it.term==='rainchain') m.rainchainTerm++; if (it.term==='splashblock') m.sbTerm++; if (it.term==='extension') m.dsExt++; if (it.cb) { m.cb++; m.cbNew++; } }
+      m.straps += STRAPS[st] || 2; if (it.term==='rainchain') m.rainchainTerm++; if (it.term==='splashblock') m.sbTerm++; if (it.term==='extension') m.dsExt++; if (it.cb) { m.cb++; m.cbNew++; } else if (it.size==='4×5"') m.outlets4x5++; }   /* a 4×5" downspout takes its own 4×5 outlet part (Ben, 15 Oct; v3.10) */
     else if (it.type==='acc') m.acc[it.sub]++;
   }
   for (const it of job.items) if (inG(it) && it.type==='run' && it.existing && it.cover) m.coverLF += (+it.len||0);   // covers on existing gutter
@@ -1554,9 +1591,10 @@ function computeMaterials(gFilter, rs, noOv){ // gFilter: 'all' or group index; 
   m.tieIn = 0; m.tieInStraight = 0; for (const c of rs.corners) { if (gFilter!=='all' && !c.groups.includes(+gFilter)) continue; if (c.kind==='miter_in') m.miterIn++; else if (c.kind==='miter_out') m.miterOut++; else if (c.kind==='miter_bay_in') m.miterBayIn++; else if (c.kind==='miter_bay_out') m.miterBayOut++; if (c.tiein) { m.tieIn++; if (c.kind==='seam') m.tieInStraight++; } }   // straight-on joins to old gutter are tie-ins too (Ben, 16 Oct; v3.8.1)
   m.miterBay = m.miterBayIn + m.miterBayOut; m.rainchains = (m.acc.rainchain||0) + (m.rainchainTerm||0); m.rcKits = m.rainchains; m.splashblocks = (m.acc.splashblock||0) + (m.sbTerm||0);   // one install kit per rain chain
   const ovs = noOv ? {} : ovMap(gFilter), hasO = id => ovs[id]!==undefined;   // typed-over counts replace the auto ones
-  for (const id of Object.keys(ovs)) { const f = ovField(id); if (f && id!=='outlets') f.set(m, +ovs[id]); }
+  for (const id of Object.keys(ovs)) { const f = ovField(id); if (f && id!=='outlets' && id!=='outlets4x5') f.set(m, +ovs[id]); }
   if (hasO('endcapL') || hasO('endcapR')) m.endcaps = m.endcapL + m.endcapR;
-  m.outlets = hasO('outlets') ? +ovs.outlets : m.ds - m.cbNew + m.dropOutlets + m.miniDs;   // a collector box on a NEW downspout carries its own outlet; a reused downspout never had one counted (v3.8.1)
+  if (hasO('outlets4x5')) m.outlets4x5 = +ovs.outlets4x5;
+  m.outlets = hasO('outlets') ? +ovs.outlets : m.ds - m.cbNew - m.outlets4x5 + m.dropOutlets + m.miniDs;   // standard outlets: a collector box on a NEW downspout carries its own outlet; a reused downspout never had one counted (v3.8.1); 4×5 downspouts take the separate 4×5 outlet (v3.10)
   m.miters = m.miterIn + m.miterOut + m.miterBayIn + m.miterBayOut;   // Geocel: 1 tube per 3 miters; end caps only matter on a job with no miters (1 tube per 20)
   m.geocel = m.miters ? Math.ceil(m.miters/3) : ((m.newLF>0 || m.endcaps>0) ? Math.max(1, Math.ceil(m.endcaps/20)) : 0);
   return m;
@@ -1602,7 +1640,8 @@ function renderMaterials(){
   html += orow('cb', 'Collector boxes', mm => mm.cb||'') + orow('dsExt', 'Downspout extensions', mm => mm.dsExt||'');
   html += orow('dropOutlets', 'Drop outlets', mm => mm.dropOutlets||'');
   if (mA.miniDs || ovs.miniDs!==undefined) html += orow('miniDs', 'Mini downspouts (from offcuts)', mm => mm.miniDs||'');
-  html += orow('outlets', 'Outlets (DS + drop + mini; not collector boxes)', mm => mm.outlets||'');
+  html += orow('outlets', 'Outlets, standard (DS + drop + mini; not collector boxes or 4×5)', mm => mm.outlets||'');
+  html += orow('outlets4x5', 'Outlets, 4×5" (one per new 4×5 downspout)', mm => mm.outlets4x5||'');
   html += `<tr><td>Pipe bands <span style="font-size:11px;color:#555">(auto ${m.straps})</span></td><td><input type="number" inputmode="numeric" id="strapOv" placeholder="${m.straps}" value="${ov??''}"></td></tr>`;
   const hov = job.manual.hangerOv[strapKey]; html += `<tr><td>Hangers <span style="font-size:11px;color:#555">(auto ${m.hangers} = ${fmtLF(m.newLF)} ÷ 2)</span></td><td><input type="number" inputmode="numeric" id="hangerOv" placeholder="${m.hangers}" value="${hov??''}"></td></tr>`;
   const gov = job.manual.geocelOv[strapKey]; html += `<tr><td>Geocel (tubes) <span style="font-size:11px;color:#555">(auto ${m.geocel} = ${m.miters ? `${m.miters} miter${m.miters>1?'s':''} ÷ 3` : `no miters, ${m.endcaps} end cap${m.endcaps===1?'':'s'} ÷ 20`})</span></td><td><input type="number" inputmode="numeric" id="geocelOv" placeholder="${m.geocel}" value="${gov??''}"></td></tr>`;
@@ -1799,38 +1838,44 @@ function scopeLinesFor(g){
   const lines = [...b.lines, ...(job.scope.covers==='separate' ? scopeCoverLines(g, job.manual.coverType) : [])].map(String).filter(t => t.trim());
   return lines.length ? [b.heading, ...lines].map(String).filter(t => t.trim()) : null;
 }
-function copyBlocks(pa){
+function copyBlocks(pa){   /* v3.10: scope text only. The price never goes into a Jobber description (Ben, 17 Oct); it has its own Copy price button. */
   pa = pa || priceAll();
-  return pa.groups.map(p => {
-    const price = p.manualOnly ? '' : money(p.total);   // copper: the price is left blank, Ben fills it in from a live material list
-    const scope = scopeLinesFor(p.g);
-    if (!scope) return `${GROUPS[p.g].n} — ${price}`.trimEnd();
-    return [...scope, `Price: ${price}`.trimEnd()].join('\n');
-  });
+  return pa.groups.map(p => { const scope = scopeLinesFor(p.g); return scope ? scope.join('\n') : null; }).filter(Boolean);
 }
-function copyForJobber(){
+function priceLines(pa){   /* "Base — $X" / "Option 1 — $Y": what Ben types into each Jobber line item's price box */
+  pa = pa || priceAll();
+  return pa.groups.map(p => `${GROUPS[p.g].n} — ${p.manualOnly ? '' : money(p.total)}`.trimEnd());   /* copper: left blank, priced by hand from a live material list */
+}
+function copyForJobber(){   /* copies each group's scope block; prices stay out of it (Ben, 17 Oct) */
+  const pa = priceAll();
+  if (!pa.groups.length) return toast('Nothing on the drawing yet');
+  const stale = pa.groups.filter(p => { const b = scopeGroupBlock(p.g); return b && b.stale; });
+  if (stale.length) {   // a hand-edited scope the drawing has moved past
+    const ov = openSheet(`<h3>Can't copy yet</h3><p>${esc(stale.map(p => GROUPS[p.g].n).join(', '))}: the scope was edited by hand and the drawing has changed since. Open the Scope tab and tap Regenerate, or Edit and Save, then copy again.</p><div class="actions"><button class="btn gold" id="cpOk">OK</button></div>`);
+    ov.querySelector('#cpOk').onclick = closeSheet; return;
+  }
+  const blocks = copyBlocks(pa); if (!blocks.length) return toast('No scope lines yet — nothing to copy');
+  scopeCopy(blocks.join('\n\n')).then(ok => { if (ok) toast('Scope copied — paste it into each Jobber line item'); });   /* B6: when the iPad refuses the clipboard, scopeCopy opens the copy-by-hand sheet */
+}
+function copyPrice(force){   /* copies "Base — $X" per group; this is the copy that records what was quoted (lastCopy) */
   const pa = priceAll();
   if (!pa.groups.length) return toast('Nothing on the drawing to price yet');
+  if (!force && baseEmptyWarning().length) return confirmSheet(baseEmptyWarning()[0] + ' Copy the price anyway?', 'Copy anyway', () => copyPrice(true));
   const inc = pa.groups.filter(p => p.incomplete);
   if (inc.length) {   // never hand Jobber a number with a hole in it
     const why = inc.map(p => `${GROUPS[p.g].n}: ` + p.lines.filter(l => l.missing).map(l => `${l.label} (${MISS_WHY[l.why] || MISS_WHY.rate})`).join('; '));
     const ov = openSheet(`<h3>Can't copy yet</h3><p>${inc.length > 1 ? 'These groups are' : 'This group is'} incomplete:</p><ul class="vlist">${why.map(w => `<li>${esc(w)}</li>`).join('')}</ul><p class="pnote">Rates come from the price book sheet; the app picks up a change the next time a job opens with signal.</p><div class="actions"><button class="btn gold" id="cpOk">OK</button></div>`);
     ov.querySelector('#cpOk').onclick = closeSheet; return;
   }
-  const stale = pa.groups.filter(p => { const b = scopeGroupBlock(p.g); return b && b.stale; });
-  if (stale.length) {   // a hand-edited scope the drawing has moved past would sit next to a price that counts the new drawing
-    const ov = openSheet(`<h3>Can't copy yet</h3><p>${esc(stale.map(p => GROUPS[p.g].n).join(', '))}: the scope was edited by hand and the drawing has changed since. Open the Scope tab and tap Regenerate, or Edit and Save, then copy again.</p><div class="actions"><button class="btn gold" id="cpOk">OK</button></div>`);
-    ov.querySelector('#cpOk').onclick = closeSheet; return;
-  }
   const totals = Object.fromEntries(pa.groups.map(p => [p.g, p.manualOnly ? null : p.total]));
-  copyText(copyBlocks(pa).join('\n\n')).then(ok => {
-    if (!ok) return toast("Couldn't copy — try again");
+  const done = () => {   /* runs on a successful copy, or when the rep taps Done on the copy-by-hand sheet (B6) */
     job.price.lastCopy = {at: Date.now(), totals, sig: pbView ? pbView.sig : '', pulledAt: pbView ? pbView.pulledAt : ''};
     const notes = [];
     if (pa.anyHand) notes.push('copper left blank, price it by hand');
     if (pa.empty.length) notes.push(`${pa.empty.map(p => GROUPS[p.g].n).join(', ')} left out (nothing priced)`);
-    touch(); renderPrice(); toast(notes.length ? 'Copied — ' + notes.join('; ') : 'Copied — paste it into the Jobber quote');
-  });
+    touch(); renderPrice(); toast(notes.length ? 'Price copied — ' + notes.join('; ') : 'Price copied — type it into each Jobber line item, not the description');
+  };
+  scopeCopy(priceLines(pa).join('\n'), done).then(ok => { if (ok) done(); });
 }
 function copyText(t){   // clipboard writers: Copy for Jobber, and Copy setup code on the Price Book screen
   try { if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t).then(() => true, () => copyFallback(t)); } catch(e){}
@@ -1897,7 +1942,7 @@ function renderPrice(){
   h += `</table>`;
   h += `<div class="prow"><b>Difficulty fee</b> <input type="number" inputmode="decimal" min="0" step="any" id="prFee" value="${P.fee.amount || ''}" placeholder="0" style="width:96px"> on <select id="prFeeG">${GROUPS.map((gr, i) => `<option value="${i}" ${(+P.fee.group || 0) === i ? 'selected' : ''}>${esc(gr.n)}</option>`).join('')}</select> <input type="text" id="prFeeNote" value="${esc(P.fee.note)}" placeholder="why (optional)" style="flex:1;min-width:140px"></div>`;
   if (job.items.some(i => i.type==='run' && !i.existing && i.tearOut)) h += `<div class="prow"><b>Tear-off</b> ${segHTML('prTear', [['0','Charge'],['1','Waive on this job']], P.tearWaived ? '1' : '0')}</div>`;
-  h += `<div class="prow"><button class="btn gold" id="prCopy">Copy for Jobber</button><span class="pnote">Base first, then each Option: one price per Jobber line item.</span></div>`;
+  h += `<div class="prow"><button class="btn gold" id="prCopy">Copy for Jobber</button><button class="btn" id="prCopyPrice">Copy price</button><span class="pnote">Copy for Jobber = the scope text for each line item, no prices. Copy price = "Base — $X" per group, for the price box; it never goes in the description.</span></div>`;
   el.innerHTML = `<div class="pcard">${head}<div class="pbd">${h}</div></div>`;
   wireHead();
   el.querySelectorAll('tr.pg').forEach(tr => tr.onclick = () => { const g = +tr.dataset.pg; priceDetail = priceDetail === g ? null : g; renderPrice(); });
@@ -1911,7 +1956,7 @@ function renderPrice(){
   el.querySelector('#prFeeG').addEventListener('change', e => { P.fee.group = +e.target.value; edited(); });
   el.querySelector('#prFeeNote').addEventListener('change', e => { P.fee.note = e.target.value.trim().slice(0, 120); edited(); });
   wireSeg(el, 'prTear', v => { P.tearWaived = v === '1'; edited(); });
-  el.querySelector('#prCopy').onclick = copyForJobber;
+  el.querySelector('#prCopy').onclick = copyForJobber; el.querySelector('#prCopyPrice').onclick = copyPrice;
 }
 
 /* ---------------- price book screen (Jobs → Price Book) ---------------- */
@@ -2046,17 +2091,23 @@ function scopeLines(g, rs){
 }
 function scopeHeading(g){ const a = String(job.scope.areas[g]||'').trim(); return g ? `${a || GROUPS[g].n} - ${SC_GCOLOR[g]} on drawing` : a; }
 function scopeCoverHeading(g, t, ref){ const h = SC_COVER_HEAD[t] || SC_COVER_HEAD['']; if (!ref) return h; const a = String(job.scope.areas[g]||'').trim(); return `${h} - ${g ? `${a || GROUPS[g].n} (${SC_GCOLOR[g]})` : (a || 'Base')}`; }
-function scopeBlock(key, g, kind, cover, heading, gen){
-  const ov = job.scopeOv[key], genText = gen.join('\n');
-  if (ov && typeof ov.text==='string') { const lines = ov.text.replace(/\s+$/, '').split('\n').map(s => s.replace(/\s+$/, '')); while (lines.length && !lines[0].trim()) lines.shift(); return {key, g, kind, cover, heading, gen, lines, edited:true, stale: ov.gen!==genText}; }
-  return {key, g, kind, cover, heading, gen, lines: gen, edited:false, stale:false};
+function scopeGenFixed(fn){   /* B7 (v3.10): generate with the text switches held fixed, so flipping Colors / Sergeant Seamless Way never marks a hand edit stale; only the drawing and the manual fields can */
+  const sc = job.scope, keep = {colors: sc.colors, ssway: sc.ssway}; sc.colors = false; sc.ssway = false;
+  try { return fn().join('\n'); } finally { Object.assign(sc, keep); }
+}
+function scopeBlock(key, g, kind, cover, heading, gen, genFixed){
+  const ov = job.scopeOv[key], genText = gen.join('\n'); if (genFixed===undefined) genFixed = genText;
+  if (ov && typeof ov.text==='string') { const lines = ov.text.replace(/\s+$/, '').split('\n').map(s => s.replace(/\s+$/, '')); while (lines.length && !lines[0].trim()) lines.shift();
+    const stale = typeof ov.genFixed==='string' ? ov.genFixed!==genFixed : ov.gen!==genText;   /* edits saved before v3.10 keep the old comparison until re-saved */
+    return {key, g, kind, cover, heading, gen, genFixed, lines, edited:true, stale}; }
+  return {key, g, kind, cover, heading, gen, genFixed, lines: gen, edited:false, stale:false};
 }
 // gFilter: 'all' (every group, Jobber order) or one group number. Blocks may be empty (nothing drawn yet) — exports and copy skip those.
 function computeScope(gFilter){
   const rs = resolveEnds(), all = scopeGroups(), groups = (gFilter===undefined || gFilter==='all') ? all : [+gFilter];
   const sep = job.scope.covers==='separate', covG = all.filter(scopeHasCovers), out = [];
   for (const g of groups) {
-    out.push(scopeBlock('g' + g, g, 'group', null, scopeHeading(g), scopeLines(g, rs)));
+    out.push(scopeBlock('g' + g, g, 'group', null, scopeHeading(g), scopeLines(g, rs), scopeGenFixed(() => scopeLines(g, rs))));
     if (sep && covG.includes(g)) for (const t of scopeOffer()) out.push(scopeBlock(`c${g}:${t}`, g, 'covers', t, scopeCoverHeading(g, t, covG.length > 1 || g > 0), scopeCoverLines(g, t, true)));
   }
   return out;
@@ -2075,10 +2126,10 @@ function scopeWarnings(){
   if (job.items.some(i => i.type==='text' && /tear\s*(out|off)/i.test(i.text||'')) && !job.items.some(i => i.type==='run' && !i.existing && i.tearOut)) w.push('A "Tear out" note is on the drawing but no run is marked "Replaces old gutter" — the scope will not mention tear out');
   return w;
 }
-async function scopeCopy(t){   // Scope tab: true = copied; null = the iPad refused both ways, so the text is shown in a sheet to copy by hand
+async function scopeCopy(t, onDone){   // Scope tab, Copy for Jobber and Copy price: true = copied; null = the iPad refused both ways, so the text is shown in a sheet to copy by hand (onDone runs when the rep taps Done)
   if (await copyText(t)) return true;
   const ov = openSheet(`<h3>Copy this text</h3><div class="row" style="font-size:14px">The iPad didn't allow an automatic copy. Press and hold in the box, tap Select All, then Copy.</div><div class="row"><textarea class="scEdit" id="cpBox">${esc(t)}</textarea></div><div class="actions"><button class="btn gold" id="cpDone">Done</button></div>`);
-  const ta = ov.querySelector('#cpBox'); try { ta.focus(); ta.select(); ta.setSelectionRange(0, ta.value.length); } catch(e){} ov.querySelector('#cpDone').onclick = closeSheet; return null;   // box is not readonly: the iPad only offers Select All in an editable box
+  const ta = ov.querySelector('#cpBox'); try { ta.focus(); ta.select(); ta.setSelectionRange(0, ta.value.length); } catch(e){} ov.querySelector('#cpDone').onclick = () => { closeSheet(); if (onDone) onDone(); }; return null;   // box is not readonly: the iPad only offers Select All in an editable box
 }
 function setMatView(v){
   matView = v; const p = $('#matPanel'); p.classList.toggle('scopeview', v==='scope'); $('#mvMat').classList.toggle('active', v==='mat'); $('#mvScope').classList.toggle('active', v==='scope');
@@ -2108,7 +2159,7 @@ function renderScope(){
     x += b.kind==='group' ? `<input class="scArea" data-area="${b.g}" value="${esc(sc.areas[b.g]||'')}" placeholder="${b.g ? 'Area name (e.g. Rear porch)' : 'Area name (optional)'}" autocomplete="off">` : '<span style="flex:1"></span>';
     if (!isEd) x += `<button class="btn sm gold" data-copy="${b.key}" style="${scLive(b) ? '' : 'display:none'}">Copy</button><button class="btn sm ghost" data-edit="${b.key}">Edit</button>${b.edited ? `<button class="btn sm ghost" data-regen="${b.key}">Regenerate</button>` : ''}`;
     x += `</div><div class="scHeading" data-hd="${b.key}">${esc(b.heading)}</div>`;
-    if (b.stale) x += `<div class="scStale">The drawing or scope settings changed after this block was edited — check it, or tap Regenerate.</div>`;
+    if (b.stale) x += `<div class="scStale">The drawing changed after this block was edited — check it, or tap Regenerate.</div>`;
     if (isEd) x += `<textarea class="scEdit" id="scEditBox">${esc(scDrafts[b.key] ?? b.lines.join('\n'))}</textarea><div class="actions"><button class="btn ghost sm" id="scEdCancel">Cancel</button><button class="btn gold sm" id="scEdSave">Save</button></div>`;
     else x += `<div class="scLines" data-ln="${b.key}">${scLinesHTML(b)}</div>`;
     if (b.kind==='group' && !b.edited && !isEd) x += `<label class="scExtraL">Extra lines for this block<textarea data-extra="${b.g}" rows="2" placeholder="Anything the drawing can't say — one line each">${esc(sc.extra[b.g]||'')}</textarea></label>`;
@@ -2128,14 +2179,17 @@ function renderScope(){
   const eb = el.querySelector('#scEditBox'); if (eb) eb.addEventListener('input', () => { scDrafts[scEditing] = eb.value; });
   el.querySelectorAll('[data-regen]').forEach(b => b.onclick = () => { delete job.scopeOv[b.dataset.regen]; touch(); renderScope(); toast('Back to the scope written from the drawing'); });
   const sv = el.querySelector('#scEdSave'); if (sv) sv.onclick = () => { const b = computeScope('all').find(x => x.key===scEditing), t = el.querySelector('#scEditBox').value;
-    if (b) { if (t.trim()===b.gen.join('\n').trim()) delete job.scopeOv[b.key]; else job.scopeOv[b.key] = {text:t, gen:b.gen.join('\n')}; delete scDrafts[b.key]; } scEditing = null; touch(); renderScope(); };
+    if (b) { if (t.trim()===b.gen.join('\n').trim()) delete job.scopeOv[b.key]; else job.scopeOv[b.key] = {text:t, gen:b.gen.join('\n'), genFixed:b.genFixed}; delete scDrafts[b.key]; } scEditing = null; touch(); renderScope(); };
   const cn = el.querySelector('#scEdCancel'); if (cn) cn.onclick = () => { delete scDrafts[scEditing]; scEditing = null; renderScope(); };
 }
 
 /* ---------------- export ---------------- */
-function sceneBBox(){
+function sceneBBox(clean){
   let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity; const add=(x,y)=>{ if(x<x0)x0=x; if(y<y0)y0=y; if(x>x1)x1=x; if(y>y1)y1=y; };
-  for (const it of job.items) { if (it.type==='run') { add(it.x1,it.y1); add(it.x2,it.y2); } else if (it.type==='ink') it.pts.forEach(q=>add(q[0],q[1])); else if (it.type==='text' || it.type==='tag') { const ex = it.type==='text' ? (String(it.text||'').split(/\n+/).filter(Boolean).length-1)*8 : 0; add(it.x-60,it.y-15-ex); add(it.x+60,it.y+15+ex); if (it.lx!==undefined) add(it.lx,it.ly); (it.ptrs||[]).forEach(q => add(q[0],q[1])); } else if (it.type==='ds') { add(it.x-70,it.y-30); add(it.x+70,it.y+35); } else { add(it.x-25,it.y-25); add(it.x+25,it.y+35); } }
+  const dsBox = d => { const e = dsLabelExtent(d, clean), keep = 12, m = 6;   /* B5: room for the label in any of its 8 positions, or where it was dragged to */
+    if (d.lo && e.w) { add(d.x+d.lo[0]-e.w/2-m, d.y+d.lo[1]-e.h/2-m); add(d.x+d.lo[0]+e.w/2+m, d.y+d.lo[1]+e.h/2+m); add(d.x-30, d.y-30); add(d.x+30, d.y+35); }
+    else { const rx = keep + e.w + m, ry = keep + e.h + m; add(d.x-Math.max(rx,30), d.y-Math.max(ry,30)); add(d.x+Math.max(rx,30), d.y+Math.max(ry,35)); } };
+  for (const it of job.items) { if (it.type==='run') { add(it.x1,it.y1); add(it.x2,it.y2); } else if (it.type==='ink') it.pts.forEach(q=>add(q[0],q[1])); else if (it.type==='text' || it.type==='tag') { const ex = it.type==='text' ? (String(it.text||'').split(/\n+/).filter(Boolean).length-1)*8 : 0; add(it.x-60,it.y-15-ex); add(it.x+60,it.y+15+ex); if (it.lx!==undefined) add(it.lx,it.ly); (it.ptrs||[]).forEach(q => add(q[0],q[1])); } else if (it.type==='ds') dsBox(it); else { add(it.x-25,it.y-25); add(it.x+25,it.y+35); } }
   for (const p of job.photos) add(p.x,p.y);
   const fp = bgFootprint(); if (fp) { add(fp.x,fp.y); add(fp.x+fp.w,fp.y+fp.h); }
   if (x0===Infinity) { x0=0;y0=0;x1=400;y1=300; }
@@ -2331,9 +2385,9 @@ function pdfDrawingPage(doc){
   const sc = scopeForDrawing(pdfMeasure(doc), legendH);
   const area = {x:M, y:FRAME.bodyTop, w:PW-2*M, h:FRAME.footerRule - 10 - legendH - sc.h - FRAME.bodyTop};
   doc.setDrawColor(...navy); doc.setLineWidth(1); doc.rect(area.x,area.y,area.w,area.h);
-  const bb = sceneBBox(); const k = Math.min(area.w/bb.w, area.h/bb.h); const ox = area.x + (area.w - bb.w*k)/2, oy = area.y + (area.h - bb.h*k)/2;
+  const bb = sceneBBox(false); const k = Math.min(area.w/bb.w, area.h/bb.h); const ox = area.x + (area.w - bb.w*k)/2, oy = area.y + (area.h - bb.h*k)/2;
   const fp = bgFootprint(); if (fp) { try { doc.addImage(rotatedBgDataURL(), 'JPEG', ox+(fp.x-bb.x)*k, oy+(fp.y-bb.y)*k, fp.w*k, fp.h*k, undefined, 'FAST'); } catch(e){} }
-  const rs = resolveEnds(); const p = pdfPainter(doc, ox, oy, bb.x, bb.y, k); const o = {field:false, isSel: () => false, invalid:new Set(), ends: rs.ends, dom: dominantProfile(), placed: []}; drawScene(p,o); drawPins(p,o);
+  const rs = resolveEnds(); const p = pdfPainter(doc, ox, oy, bb.x, bb.y, k); const o = {field:false, isSel: () => false, invalid:new Set(), ends: rs.ends, dom: dominantProfile(), placed: [], bounds: bb}; drawScene(p,o); drawPins(p,o);
   let ly = area.y+area.h+14, lx = M; doc.setFontSize(8.5); doc.setFont('helvetica','bold'); doc.setTextColor(...navy);
   if (groups.length) { doc.text('OPTIONS:', lx, ly); lx += 48; for (const g of groups) { const c=GROUPS[g].c; doc.setFillColor(parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16)); doc.setDrawColor(...navy); doc.rect(lx, ly-7, 10, 10, 'FD'); doc.setFont('helvetica','normal'); const t = pdfSafe(optLegendText(g)); doc.text(t, lx+14, ly); lx += 14 + doc.getTextWidth(t) + 14; } ly += 14; }
   { const lp = pdfPainter(doc, 0, 0, 0, 0, 1); const meas = t => { doc.setFont('helvetica','normal'); doc.setFontSize(7.5); return doc.getTextWidth(t); };
@@ -2371,18 +2425,20 @@ function pdfMaterialsPages(doc, after){   // after = true: the crew packet — p
       else { scopePaged(sb, pdfMeasure(doc)).forEach((l, i) => { if (i) doc.addPage(); pages.push('SCOPE OF WORK' + (i ? ' (cont.)' : '')); drawScopePage(pdfScopeR(doc), l); }); matFirst = pages.length + 1; } } }
   newPage(); y += top1;
   const hasOpts = groups.length>0; const sections = hasOpts ? [['all','COMBINED — all groups'], ...activeGroups().map(g=>[String(g), GROUPS[g].n.toUpperCase()])] : [['all','MATERIALS']];
-  const line = (label, val, sub) => { if (y > FRAME.footerRule-20) newPage(); doc.setFont('helvetica','normal'); doc.setFontSize(sub?9:10); doc.setTextColor(sub?90:0, sub?90:23, sub?90:56); doc.text((sub?'      ':'')+label, M+6, y); doc.setFont('helvetica','bold'); doc.text(String(val), M+262, y, {align:'right'}); doc.setDrawColor(225); doc.line(M, y+4, M+268, y+4); y += sub?12:13.5; };
+  const zero = v => v===0 || v==='0' || v==="0'" || v==='—' || v==='No' || v==='' || v===undefined;   /* quick win (v3.10): the crew packet skips zero lines */
+  const line = (label, val, sub) => { if (zero(val)) return; if (y > FRAME.footerRule-20) newPage(); doc.setFont('helvetica','normal'); doc.setFontSize(sub?9:10); doc.setTextColor(sub?90:0, sub?90:23, sub?90:56); doc.text((sub?'      ':'')+label, M+6, y); doc.setFont('helvetica','bold'); doc.text(String(val), M+262, y, {align:'right'}); doc.setDrawColor(225); doc.line(M, y+4, M+268, y+4); y += sub?12:13.5; };
   const colR = M + 290;
   for (const [key, title] of sections) {
+    if (key!=='all' && !job.items.some(i => (i.g||0)===+key && (i.type==='run' || i.type==='ds' || i.type==='acc'))) continue;   /* v3.10: an Option with nothing countable gets no table */
     const m = computeMaterials(key, rs); if (y > FRAME.footerRule-100) newPage();
     const mA = computeMaterials(key, rs, true), ovK = ovMap(key); const ed = (id, isLF) => { if (ovK[id]===undefined) return ''; const a = ovField(id).get(mA); return ` (edited; auto ${isLF?fmtLF(a):a})`; };
     doc.setFillColor(...navy); doc.rect(M, y-10, 268, 16, 'F'); doc.setTextColor(...gold); doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.text(title + '   (from drawing)', M+6, y+1); y += 18;
-    const profs = Object.keys(m.gutter); if (profs.length) profs.forEach(pr => line(`Gutter ${pr}` + ed('gutter:'+pr, true), fmtLF(m.gutter[pr]))); else line('Gutter','—');
+    const profs = Object.keys(m.gutter).filter(pr => m.gutter[pr]); if (profs.length) profs.forEach(pr => line(`Gutter ${pr}` + ed('gutter:'+pr, true), fmtLF(m.gutter[pr]))); else { doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(90); doc.text('No new gutter in this scope', M+6, y); y += 13.5; }
     if (m.rakeLF) line('incl. rake' + ed('rakeLF', true), fmtLF(m.rakeLF), true);
     if (m.sgLF) line(`incl. ${SPLASH_GUARD_LF}' x ${m.acc.splashguard} splash guards`, fmtLF(m.sgLF), true);
     line('Gutter covers' + (job.manual.coverType ? ` — ${job.manual.coverType}` : '') + ed('coverLF', true), fmtLF(m.coverLF)); line('End caps', m.endcaps); line('left' + ed('endcapL'), m.endcapL, true); line('right' + ed('endcapR'), m.endcapR, true); line('Miters — inside' + ed('miterIn'), m.miterIn); line('Miters — outside' + ed('miterOut'), m.miterOut); line('Bay miters — outside' + ed('miterBayOut'), m.miterBayOut); line('Bay miters — inside' + ed('miterBayIn'), m.miterBayIn); if (m.tieIn) line(m.tieInStraight ? `incl. tie-in to existing (${m.tieInStraight} straight-on splice${m.tieInStraight>1?'s':''})` : 'incl. tie-in to existing gutter (strip miter)', m.tieIn, true);
     line('Downspouts (new) — pieces' + ed('dsPieces'), m.dsPieces); Object.keys(m.dsPiecesBySize).forEach(s => line(s + ' pieces', m.dsPiecesBySize[s], true)); if (m.miniPieces) line(`incl. for ${m.miniDs} mini downspouts`, m.miniPieces, true); if (m.ds) line('drops (one per downspout location)', m.ds, true); storyKeys(m.dsByStory).forEach(st => line(storyName(st==='LR'?'LR':+st) + ' drops', m.dsByStory[st], true)); if (m.dsReuse) line('existing — reuse (not counted)', m.dsReuse, true);
-    line('Elbows A' + ed('elbA'), m.elbA); line('Elbows B' + ed('elbB'), m.elbB); OFFSET_SIZES.forEach(sz => line(`Offsets ${sz}` + ed('off'+sz), m.offsets[sz])); if (m.elbRound || OFFSET_SIZES.some(sz => m.offRound[sz])) { line('Round elbows (4")' + ed('elbRound'), m.elbRound); OFFSET_SIZES.forEach(sz => line(`Round offsets ${sz}` + ed('roff'+sz), m.offRound[sz])); } line('Collector boxes' + ed('cb'), m.cb); line('Downspout extensions' + ed('dsExt'), m.dsExt); line('Drop outlets' + ed('dropOutlets'), m.dropOutlets); if (m.miniDs) line('Mini downspouts (from offcuts)' + ed('miniDs'), m.miniDs); line('Outlets (DS + drop + mini)' + ed('outlets'), m.outlets);
+    line('Elbows A' + ed('elbA'), m.elbA); line('Elbows B' + ed('elbB'), m.elbB); OFFSET_SIZES.forEach(sz => line(`Offsets ${sz}` + ed('off'+sz), m.offsets[sz])); if (m.elbRound || OFFSET_SIZES.some(sz => m.offRound[sz])) { line('Round elbows (4")' + ed('elbRound'), m.elbRound); OFFSET_SIZES.forEach(sz => line(`Round offsets ${sz}` + ed('roff'+sz), m.offRound[sz])); } line('Collector boxes' + ed('cb'), m.cb); line('Downspout extensions' + ed('dsExt'), m.dsExt); line('Drop outlets' + ed('dropOutlets'), m.dropOutlets); if (m.miniDs) line('Mini downspouts (from offcuts)' + ed('miniDs'), m.miniDs); line('Outlets, standard (DS + drop + mini)' + ed('outlets'), m.outlets); line('Outlets, 4×5"' + ed('outlets4x5'), m.outlets4x5);
     const ovr = job.manual.straps[key]; line('Pipe bands' + (ovr!==undefined?` (override; auto ${m.straps})`:''), ovr!==undefined?ovr:m.straps);
     const hov = job.manual.hangerOv[key]; line('Hangers' + (hov!==undefined?` (override; auto ${m.hangers})`:` (${fmtLF(m.newLF)} / 2)`), hov!==undefined?hov:m.hangers);
     const gov = job.manual.geocelOv[key]; line('Geocel (tubes)' + (gov!==undefined?` (override; auto ${m.geocel})`:(m.miters?` (${m.miters} miters / 3)`:' (no miters)')), gov!==undefined?gov:m.geocel);
@@ -2446,10 +2502,10 @@ function exportDrawingPNG(){
   canvasFrame(x, 'JOB DRAWING');
   const area = {x:M, y:FRAME.bodyTop, w:PW-2*M, h:FRAME.footerRule - 10 - legendH - sc.h - FRAME.bodyTop};
   x.strokeStyle=hex(RGB.navy); x.lineWidth=1; x.strokeRect(area.x,area.y,area.w,area.h);
-  const bb = sceneBBox(); const k = Math.min(area.w/bb.w, area.h/bb.h); const ox = area.x + (area.w - bb.w*k)/2, oy = area.y + (area.h - bb.h*k)/2;
+  const bb = sceneBBox(true); const k = Math.min(area.w/bb.w, area.h/bb.h); const ox = area.x + (area.w - bb.w*k)/2, oy = area.y + (area.h - bb.h*k)/2;
   x.save(); x.beginPath(); x.rect(area.x,area.y,area.w,area.h); x.clip(); x.translate(ox,oy); x.scale(k,k); x.translate(-bb.x,-bb.y);
   const p = canvasPainter(x); const fp = bgFootprint(); if (fp) p.image(imgCache.get(job.bg.imgId).img, job.bg.x||0, job.bg.y||0, job.bg.w, job.bg.h, job.bg.rot||0);
-  const rs = resolveEnds(); const o = {field:false, clean:true, isSel: () => false, invalid:new Set(), ends: rs.ends, dom: dominantProfile(), placed: []}; drawScene(p,o); drawPins(p,o); x.restore();
+  const rs = resolveEnds(); const o = {field:false, clean:true, isSel: () => false, invalid:new Set(), ends: rs.ends, dom: dominantProfile(), placed: [], bounds: bb}; drawScene(p,o); drawPins(p,o); x.restore();
   let ly = area.y+area.h+14, lx = M; x.textBaseline='alphabetic'; x.textAlign='left';
   if (groups.length) { x.fillStyle=hex(RGB.navy); x.font='700 8.5px Helvetica,Arial'; x.fillText('OPTIONS:', lx, ly); lx += 48; for (const g of groups) { x.fillStyle=GROUPS[g].c; x.fillRect(lx, ly-7, 10, 10); x.strokeStyle=hex(RGB.navy); x.strokeRect(lx, ly-7, 10, 10); x.fillStyle=hex(RGB.navy); x.font='400 8.5px Helvetica,Arial'; const t=optLegendText(g); x.fillText(t, lx+14, ly); lx += 14 + x.measureText(t).width + 14; } ly += 14; }
   { const lp = canvasPainter(x); const meas = t => { x.font='400 7.5px Helvetica,Arial'; return x.measureText(t).width; };
@@ -2463,15 +2519,15 @@ function exportDrawingPNG(){
 }
 function exportDrawingPDF(){
   pendingExport = exportDrawingPDF; if (blockIfInvalid()) return;
-  if (!window.jspdf) { const sc = document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'; document.head.appendChild(sc); return toast('PDF library still loading — needs internet once. Try again in a moment.'); }
+  if (!window.jspdf) { const sc = document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'; sc.integrity='sha512-qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKNRRhy5X5AAOnx5S09ydFYWWNSfcEqDTTHgtNA=='; sc.crossOrigin='anonymous'; document.head.appendChild(sc); return toast('PDF library still loading — needs internet once. Try again in a moment.'); }
   const doc = newPdf();
   const p2 = pdfDrawingPage(doc), lays = p2 ? scopePaged(p2, pdfMeasure(doc)) : [], total = 1 + lays.length; pdfFrame(doc, 'JOB DRAWING', 1, total);
   lays.forEach((l, i) => { doc.addPage(); drawScopePage(pdfScopeR(doc), l); pdfFrame(doc, 'SCOPE OF WORK', i + 2, total); });
   deliver(doc.output('blob'), filenameBase()+'_drawing.pdf');
 }
 function exportCrewPDF(){   // v3.9: one PDF for the crew — drawing (full downspout detail) + scope once + material list + job details + photos
-  pendingExport = exportCrewPDF; if (blockIfInvalid()) return; if (tearGate(exportCrewPDF)) return;
-  if (!window.jspdf) { const sc = document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'; document.head.appendChild(sc); return toast('PDF library still loading — needs internet once. Try again in a moment.'); }
+  pendingExport = exportCrewPDF; if (blockIfInvalid()) return;   /* tear-off gate is on the PNG only (Ben, 17 Oct) */
+  if (!window.jspdf) { const sc = document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'; sc.integrity='sha512-qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKNRRhy5X5AAOnx5S09ydFYWWNSfcEqDTTHgtNA=='; sc.crossOrigin='anonymous'; document.head.appendChild(sc); return toast('PDF library still loading — needs internet once. Try again in a moment.'); }
   const doc = newPdf(); const titles = ['JOB DRAWING'];
   const p2 = pdfDrawingPage(doc), lays = p2 ? scopePaged(p2, pdfMeasure(doc)) : [];
   lays.forEach((l, i) => { doc.addPage(); drawScopePage(pdfScopeR(doc), l); titles.push('SCOPE OF WORK' + (i ? ' (cont.)' : '')); });
@@ -2481,7 +2537,7 @@ function exportCrewPDF(){   // v3.9: one PDF for the crew — drawing (full down
 }
 function exportMaterialsPDF(){
   pendingExport = exportMaterialsPDF; if (blockIfInvalid()) return;
-  if (!window.jspdf) { const sc = document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'; document.head.appendChild(sc); return toast('PDF library still loading — needs internet once. Try again in a moment.'); }
+  if (!window.jspdf) { const sc = document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'; sc.integrity='sha512-qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKNRRhy5X5AAOnx5S09ydFYWWNSfcEqDTTHgtNA=='; sc.crossOrigin='anonymous'; document.head.appendChild(sc); return toast('PDF library still loading — needs internet once. Try again in a moment.'); }
   const doc = newPdf();
   const titles = pdfMaterialsPages(doc); const total = doc.getNumberOfPages();
   for (let i=1;i<=total;i++){ doc.setPage(i); pdfFrame(doc, titles[i-1] || 'MATERIAL LIST', i, total); }
@@ -2519,6 +2575,14 @@ function openJobs(){
   resize(); openJob(store.current);
   pbPull('start');   // also fired by openJob; the two share one request
   if (!localStorage.getItem('gs_welcomed')) { localStorage.setItem('gs_welcomed','1'); setTimeout(()=>toast('Add to Home Screen for full-screen use'), 800); }
+  if ('serviceWorker' in navigator && window.isSecureContext) {   /* v3.10 offline shell (Ben, 17 Oct): sw.js keeps the app on the iPad; a newer copy downloads in the background and is used on the next launch */
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.addEventListener('message', ev => { if (ev.data && ev.data.type === 'update-ready') toast('App update downloaded — close Gutter Sketch and reopen it to use it'); });
+  }
+  if (navigator.standalone === false && /iPad|iPhone|Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1) {   /* quick win (v3.10): a Safari tab has its own empty Jobs list and no price book */
+    const b = document.createElement('div'); b.id = 'tabBanner'; b.innerHTML = '<b>You\'re in a Safari tab.</b> Open Gutter Sketch from the Home Screen icon — jobs and the price book saved here won\'t show there. <button class="btn sm ghost" id="tabBannerX">OK</button>';
+    document.body.appendChild(b); b.querySelector('#tabBannerX').onclick = () => b.remove();
+  }
 })();
 })();
 </script>

@@ -17,19 +17,22 @@ All job data stays on the iPad (browser storage); no job, drawing or photo is se
 1. Repo page → **Add file → Upload files**
 2. Drop the new `gutter-sketch.html` (same filename — the home-screen icon depends on it)
 3. Type a one-line commit message saying what changed (e.g. `v3 — bay miter fix`)
-4. **Commit changes**. The site updates within a minute. On the iPad, force-quit the app and reopen.
+4. **Commit changes**. The site updates within a minute. On the iPad, open the app with signal (it downloads the new copy in the background and says so), then force-quit and reopen to run it.
 
 To roll back: repo page → **commits** → pick the older version → view the file → download it → upload it again.
 
 ## Files
 
 - `gutter-sketch.html` — the entire app, one file (HTML/CSS/JS, no build step, no backend); the brand badge and mascot are embedded inside it
+- `sw.js` — the offline shell (v3.10): a small service worker that keeps a copy of the app and its PDF library on the iPad so it opens with no signal. Holds no job data, prices or keys.
 - `icon-180.png` — the home-screen icon (badge on cream)
 - `README.md` — this file
 
 Keep it that way. No customer data, exports, credentials or other files belong in this repo — it is public.
 
 ## Version history
+
+- **v3.10** (2026-10-17) — Ben's 17 Oct decisions plus the rest of the 16 Oct audit. **Works with no signal**: a service worker (`sw.js`) keeps the app, its icon and the PDF libraries on the iPad. Open the app once with signal; after that it opens anywhere. When a newer version is published, the iPad shows the copy it has, downloads the new one in the background, toasts "App update downloaded", and runs it on the next launch. **Price out of the customer text**: Copy for Jobber now copies only each line item's scope; a new **Copy price** button copies "Base — $X" / "Option 1 — $Y" for the price boxes, and that is the copy the job remembers as quoted. Both buttons open the copy-by-hand box when the iPad refuses the clipboard (audit B6). **Mid-run tie-ins**: a new run that starts or ends part-way along existing (dashed) gutter now asks **Tie in / End cap** like a corner does, on draw and on drag (and when old gutter is drawn across a new run's end); the run end snaps onto the old gutter. Tie-in = one tie-in on the material list (a straight-on splice) and the tie-in charge, never a miter; End cap = an end cap. **4×5 outlets**: a new 4×5" downspout takes its own 4×5 outlet part, so the material list has "Outlets, standard" and "Outlets, 4×5"" (a 4×5 with a collector box takes neither); both can be typed over. **Export labels** (B5): the frame leaves room for each downspout label's real length and labels are never placed outside it; crowded labels try a second ring farther out with a leader. **Scope hand edits** (B7): flipping Colors in text or Sergeant Seamless Way no longer marks a hand-edited block out of date; only a drawing change does. **Undo** (B8): a corner flip can be undone, a corner setting moves with its run, and settings for corners that no longer exist are cleaned up on save. **Crew packet**: zero lines and Options with nothing countable are left off the material pages; the tear-off question is asked before the PNG only, not the crew packet (Ben, 17 Oct). **Warnings**: export and Copy price warn when everything is in an Option and nothing is on the Base (the minimum job applies to the Base only); opening the app in a Safari tab on an iPad shows a banner pointing to the Home Screen icon (that tab has its own empty Jobs list). The PDF library loads with an integrity check.
 
 - **v3.9.2** (2026-10-16) — **100 jobs on the iPad, and no silent deletions.** The Jobs list keeps the last 100 jobs instead of 20. Its header shows the count ("23 of 100 · saved on this iPad"), and from 90 up a note says how much room is left. Before, the 21st job quietly removed the least-recently-opened job and its photos; now nothing is ever removed without asking: at 100, **New job** (toolbar or Jobs list) and **Duplicate** first show a sheet naming the job that would go ("Jobs is full… Adding one removes the oldest job, *name*, and its photos") with Cancel or **Remove it and continue**, and the toast afterwards says which job was removed. Jobs already on the iPad are untouched. Ben's call, 16 Oct (audit item: jobs cap).
 
